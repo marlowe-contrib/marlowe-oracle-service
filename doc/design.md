@@ -4,33 +4,33 @@
 
 Oracle services provide information from the real world inside the blockchain, making it available to smart contracts. In the EUTxO-model, these services usually put data into the blockchain in the Datum of some UTxOs. For making this decentralized, the oracle data is the result of a consensus between different participants who validate it. Examples of this kind of oracles include Charli3 and Orcfax.
 
-In Marlowe contracts, the ability to have trusted information about currency exchange rates, interest rates and others is very useful. Although there is no specific language constructor for using oracles, Marlowe provides a way to obtain outsider input in a contract by using a Choice Action, which indicates that the execution will wait until some authorized entity provides the data.
-Then, the way to implement the use of an oracle in Marlowe contracts is by choice actions following a convention: for indicating that the input comes from an oracle, the choice action must have a specific Choice Name and the Choice Owner (the authorized entity) must be the oracle provider.
+In Marlowe contracts, the ability to have trusted information about currency exchange rates, interest rates and others is very useful. Although there is no specific language constructor for using oracles, Marlowe provides a way to obtain outsider input in a contract by using a **Choice Action**, which indicates that the execution will wait until some authorized entity provides the data.
+Then, the way to implement the use of an oracle in Marlowe contracts is by choice actions following a convention: for indicating that the input comes from an oracle, the choice action must have a specific **Choice Name** and the **Choice Owner** (the authorized entity) must be the oracle provider.
 The choice name has to be a keyword that the oracle service will recognize for knowing which data the contract asks for (an example is the exchange rate between ADA and USD, whose keyword could be ADAUSD). In the simplest version of an oracle service for Marlowe, the choice owner could be a specific trusted address that provides the information obtained from the external world. Another way to indicate who provides the information offers more possibilities and consists of using role tokens.
 In any case, the only thing the Marlowe contract validates is that the information comes from the indicated address or that the transaction providing the information contains the role token as an input. In the next sections, we’ll review in more detail how this validation works and how on-chain oracles such as Charli3 and Orfax can be integrated with Marlowe.
 
 ## 2. Oracles in Marlowe: validations
 
-Marlowe contracts all share a single validator and therefore a single address. We call “deploying a Marlowe contract” to the act of creating a new UTxO at the Marlowe address with the datum containing the contract code and the contract state. The contract state contains the following information:
+Marlowe contracts all share a single validator and therefore a single address. We call *“deploying a Marlowe contract”* to the act of creating a new UTxO at the Marlowe address with the datum containing the contract code and the contract state. The contract state contains the following information:
 
-- Accounts: a map indicating how much of the locked tokens correspond to each user involved in the contract.
-- Choices: a map containing the resolved choices. A choice is resolved when a number for the ChoiceID (Choice Name + Choice Owner) is provided.
-- BoundValues:  a map containing values that can be used in the contract. New values can be added using the Let action.
-- MinTime: the biggest known StartTime for transactions that interacted with this contract.
+- **Accounts**: a map indicating how much of the locked tokens correspond to each user involved in the contract.
+- **Choices**: a map containing the resolved choices. A choice is resolved when a number for the ChoiceID (Choice Name + Choice Owner) is provided.
+- **BoundValues**:  a map containing values that can be used in the contract. New values can be added using the Let action.
+- **MinTime**: the biggest known StartTime for transactions that interacted with this contract.
 
 Once a deployed Marlowe contract reaches the point where information from an Oracle is needed, it will stay in that state until the data is provided.
 
-As explained in the last section, in Marlowe, a Choice action is used to request outside data, and using a specific combination of name and owner it can be stated that the data should be coming from an Oracle.
+As explained in the last section, in Marlowe, a **Choice** action is used to request outside data, and using a specific combination of name and owner it can be stated that the data should be coming from an Oracle.
 
 A choice action has 3 parameters:
 - Choice Name: a string identifying this particular choice. It will be used in the rest of the contract to access the data of the Oracle.
-- Choice Owner: indicates who can resolve the choice. There are two options: Address or Role.
+- Choice Owner: indicates who can resolve the choice. There are two options: **Address** or **Role**.
 - Choice Bounds: a list of closed intervals of integers. The provided number must lie inside any of them.
 
 For the contract to continue, a valid transaction must be submitted. The transaction must consume the contract UTxO and provide, in the redeemer, the ChoiceID and the information (that must be a number) to resolve the choice using the correct format. The Marlowe validator will do the following checks:
-The choice owner is involved in the transaction. If the owner was specified as an Address, that address must sign the transaction, on the other hand, if it was specified using a Role, the corresponding role token must be included in an input of the transaction.
-The information provided is between at least one of the bounds.
-The state is updated appropriately. This means a new entry is added to the choices map with the ChoiceID as the key and the information as the value.
+- The choice owner is involved in the transaction. If the owner was specified as an **Address**, that address must sign the transaction, on the other hand, if it was specified using a **Role**, the corresponding role token must be included in an input of the transaction.
+- The information provided is between at least one of the bounds.
+- The state is updated appropriately. This means a new entry is added to the **choices** map with the ChoiceID as the key and the information as the value.
 
 As we can see, the mechanism to resolve choices fully trusts the Choice Owner about the data it receives. And there is no on-chain assurance about the accuracy of the value. It could be completely false or come from trusted, decentralized oracles. But to validate on-chain that they are, in fact, being used as sources, we must add a new script to the transaction. How exactly that would work is explained in the next section.
 
@@ -38,7 +38,7 @@ As we can see, the mechanism to resolve choices fully trusts the Choice Owner ab
 
 In order to integrate Marlowe with decentralized oracles in a trustless way, we built a proposal based around the Marlowe<>Charli3 design document [^4].
 
-The Marlowe Oracle Service (MOS) is a running service with the ability to query the blockchain for Marlowe contracts that require feeds. It is also capable of filtering the known feeds so it can build, balance, and submit transactions to provide these.
+The *Marlowe Oracle Service* (MOS) is a running service with the ability to query the blockchain for Marlowe contracts that require feeds. It is also capable of filtering the known feeds so it can build, balance, and submit transactions to provide these.
 The MOS will provide feeds to the two kinds of choice parties: Address and Role. The address of the MOS will be publicly available. Thus, any choice with that address as a party can be resolved with a regular transaction that just completes a choice. On the other hand, if the party is a Role with a publicly known name, the transaction will also involve the consumption of a UTxO containing a validator that we call the Oracle Bridge validator. Consequently, there will be two main components: an Off-chain backend in charge of the scanning and transaction building, and an Oracle Bridge Validator.
 
 The feeds the MOS initially supports are exchange rate prices (the only currently provided by Charli3 and Orcfax), but the modular implementation we propose allows for easy integration of new kinds of feeds.
@@ -46,11 +46,9 @@ The feeds the MOS initially supports are exchange rate prices (the only currentl
 ### 3.1 Off-chain backend
 
 The Marlowe Oracle Service will use the Marlowe Runtime service to get a list of active Marlowe contracts. Then, it will filter only the contracts that pass the following criteria:
-
-
-It has a choice action that can be resolved.
-The choice name is a valid feed name that the service knows how to provide.
-The owner is either the service’s address or a role token.
+- It has a choice action that can be resolved.
+- The choice name is a valid feed name that the service knows how to provide.
+-The owner is either the service’s address or a role token.
 
 Then, it will build, balance, and submit the transactions that resolve each contract. There are two ways to resolve a contract, depending on the type of choice owner. The resulting transaction and the data flow are different for each case.
 
@@ -83,7 +81,7 @@ The transaction will then follow this second specification (Ignoring Cardano fee
 ### 3.2 Charli3 and Orfax datum format
 Clearly, the off-chain backend needs to be able to read the Oracle Feed UTxO’s datum to get the feed information that will be used as input for the Marlowe contract. The MOS knows how to read Charli3 and Orcfax feeds.
 
-The Charli3 feed is well-specified by a CDDL [1], and it has a lot of flexibility. For our particular case, the relevant information is placed on a map, defined as price_map, and the important keys are 0, 1, and 2. Representing the price, the creation time, and the expiration time, respectively. For example, here we have an extract of the CDDL specification.
+The Charli3 feed is well-specified by a CDDL [^1], and it has a lot of flexibility. For our particular case, the relevant information is placed on a map, defined as price_map, and the important keys are `0`, `1`, and `2`. Representing the price, the creation time, and the expiration time, respectively. For example, here we have an extract of the CDDL specification.
 
 ```javascript
 price_map =
@@ -135,10 +133,10 @@ The price value format is expressed using scientific notation, so the price is s
 ### 3.3 Oracle Bridge Validator
 
 The bridge validator will have the responsibility to ensure that decentralized oracles are used effectively when a Marlowe contract requires it. It will have the following parameters:
-- The hash of the Marlowe validator
-- The currency symbol for the token held in the oracle's reference UTxO.
-- The token name for the token held in the oracle's reference UTxO.
-- The name of the Marlowe Choice where the Marlowe contract will receive oracle input.
+1. The hash of the Marlowe validator
+2. The currency symbol for the token held in the oracle's reference UTxO.
+3. The token name for the token held in the oracle's reference UTxO.
+4. The name of the Marlowe Choice where the Marlowe contract will receive oracle input.
 
 Meaning that we can complete the parameters to calculate the address of the bridge validator for each oracle feed that we want to validate. Then, for each Marlowe contract that wants to make use of the bridge validator, a new UTxO at that address will need to be created, containing the role token and with a reference (contained in the datum) to the thread token that the Marlowe contract needs to have. Both tokens will have the same policyID and will be used to make a handshake between validators. (Only one instance of the bridge script can fill each Marlowe contract and only one Marlowe contract can use each instance of the bridge script)
 
