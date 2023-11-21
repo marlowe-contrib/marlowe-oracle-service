@@ -1,0 +1,14 @@
+{
+  "name": "marlowe-oracle-service",
+  "version": "1.0.0",
+  "description": "Service for integrating oracles with Marlowe contracts",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lucid-cardano": "^0.10.7"
+  }
+}
