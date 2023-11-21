@@ -59,27 +59,26 @@ Then, it will build, balance, and submit the transactions that resolve each cont
 If the choice owner is an address, it is straightforward to query the data from the necessary source and input it into the redeemer.
 The following graph shows the flow that the Marlowe Oracle service follows in this case.
 
+![Flow diagram with address choice owner](img/address-flow-diagram.png)
+
 The Marlowe Oracle Service queries Marlowe Runtime to obtain all the contracts (1), then filters those contracts to find one that asks for Oracle input (2). After determining what the source for the oracle should be, it queries for the requested feed (3). Then, this value and the contract are sent to the Runtime to apply the Choice input and obtain the unsigned transaction body (4). After that, the transaction is signed (5) and submitted (6).
-The resulting transaction should follow this specification (Ignoring Cardano fee logic)
+The resulting transaction should follow this specification (Ignoring Cardano fee logic):
 
-<!--  TX FLOW DIAGRAM GOES HERE -->
-
-The specification of a transaction using only the address and no bridge validator.
-
-<!--  TX SPECIFICATION DIAGRAM GOES HERE -->
+![Transaction specification with address choice owner](img/address-tx-spec.png)
+*The specification of a transaction using only the address and no bridge validator.*
 
 #### Role token choice owner
 For contracts that want to utilize decentralized oracles like Charli3 or Orcfax, it first needs to check if the role token is present at a UTxO of the bridge validator. Then, it needs to include in the transaction the bridge UTxO and the Oracle Feed UTxO as a reference input.
 This is the adjusted flow diagram for the case in which the choice owner is determined by a role token.
 
+![Flow diagram with role choice owner](img/role-flow-diagram.png)
 
 The Marlowe Oracle Service queries Marlowe Runtime to obtain all the contracts (1), then filters them to find one that asks for Oracle input (2). It then queries the blockchain through the Chain Indexer to find the UTxOs of the Oracle Bridge validator (3), and filters those UTxOs to find the one with the corresponding Oracle role token (4). Then, the MOS queries the Chain Indexer again, but this time for the UTxO that holds the requested Oracle Feed (5). This value and the contract are sent to the Runtime to apply the Choice input and obtain the unsigned transaction body (6). The MOS adds the Bridge Validator UTxO as an input, and the Oracle Feed UTxO as a reference input to the transaction (7). After that, it is signed (8) and submitted (9).
 
 The transaction will then follow this second specification (Ignoring Cardano fee logic):
-<!--  TX FLOW DIAGRAM GOES HERE -->
 
-The specification of a transaction using a role token, the bridge validator, and the oracle feed.
-<!--  TX SPECIFICATION DIAGRAM GOES HERE -->
+![Transaction specification with role choice owner](img/role-tx-spec.png)
+*The specification of a transaction using a role token, the bridge validator, and the oracle feed.*
 
 ### 3.2 Charli3 and Orfax datum format
 Clearly, the off-chain backend needs to be able to read the Oracle Feed UTxO’s datum to get the feed information that will be used as input for the Marlowe contract. The MOS knows how to read Charli3 and Orcfax feeds.
