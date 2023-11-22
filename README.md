@@ -2,5 +2,8 @@
 
 ### Run
 
-Use the following command to run the service:
-```npm run dev```
+Use the following commands to install all the dependencies and then run the service:
+```bash
+    $ npm install
+    $ npm run dev
+```

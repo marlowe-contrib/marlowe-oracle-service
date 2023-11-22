@@ -8,8 +8,14 @@
   },
   "author": "",
   "license": "ISC",
-  "type" : "module",
+  "type": "module",
   "dependencies": {
+    "@marlowe.io/adapter": "^0.2.0-alpha-20",
+    "@marlowe.io/language-core-v1": "^0.2.0-alpha-20",
+    "@marlowe.io/runtime-core": "^0.2.0-alpha-20",
+    "@marlowe.io/runtime-lifecycle": "^0.2.0-alpha-20",
+    "@marlowe.io/runtime-rest-client": "^0.2.0-alpha-20",
+    "@marlowe.io/wallet": "^0.2.0-alpha-20",
     "lucid-cardano": "^0.10.7"
   },
   "devDependencies": {
