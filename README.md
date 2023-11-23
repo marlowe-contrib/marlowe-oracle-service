@@ -1,6 +1,10 @@
 # Marlowe Oracle Services
 
-### Run
+## Design
+
+A complete design document can be found [here](./docs/design.md).
+
+## Run
 
 Use the following commands to install all the dependencies and then run the service:
 ```bash

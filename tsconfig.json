@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     /* Language and Environment */
-    "target": "es2017",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
+    "target": "ES2017",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
     "moduleResolution": "Node",
     "lib": ["es2020"],
     /* Modules */
@@ -10,6 +10,8 @@
     "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
     /* Type Checking */
     "strict": true,                                      /* Enable all strict type-checking options. */
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
   },
   "ts-node": {
     "esm": true
