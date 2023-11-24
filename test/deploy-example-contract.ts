@@ -11,11 +11,13 @@ const hasValidRuntime = await client.healthcheck();
 
 if (!hasValidRuntime) throw new Error("Invalid Marlowe Runtime instance");
 
-const address = "A";
-
-const changeAddress: AddressBech32 = addressBech32(address);
+// CHANGE HERE !!
+const choice_owner = "this should be the oracle services address";
 
 const choice_name = "ADAUSD";
+
+// CHANGE HERE !!
+const changeAddress: AddressBech32 = addressBech32("your_address");
 
 function getTimeout(): bigint {
   const date = new Date();
@@ -30,7 +32,7 @@ const contractJson: Contract = {
       "case": {
         "for_choice": {
           "choice_owner": {
-            "address": address
+            "address": choice_owner
           },
           "choice_name": choice_name
         },
