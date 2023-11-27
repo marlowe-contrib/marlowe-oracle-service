@@ -28,6 +28,7 @@
     "@marlowe.io/wallet": "^0.2.0-alpha-20",
     "eslint": "^8.54.0",
     "eslint-config-airbnb-base": "^15.0.0",
+    "fp-ts": "^2.16.1",
     "lucid-cardano": "^0.10.7"
   },
   "devDependencies": {
