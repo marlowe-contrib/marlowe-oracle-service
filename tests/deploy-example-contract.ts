@@ -1,7 +1,8 @@
+import { signTx } from "../src/tx.ts"
+
 import { mkRestClient } from "@marlowe.io/runtime-rest-client";
 import { AddressBech32, addressBech32, contractId } from "@marlowe.io/runtime-core";
 import { Contract } from "@marlowe.io/language-core-v1";
-import fetch from "node-fetch";
 
 // let runtimeURL = process.env.MARLOWE_RUNTIME_URL;
 let runtimeURL = "https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io";
@@ -62,38 +63,16 @@ const contract = await client.createContract(request);
 
 if (!contract) throw new Error("Failed creating contract")
 
-console.log("contractID: ",contract.contractId);
-console.log("contractTX: ",contract.tx);
-
-async function signTx() {
-  try {
-    const response = await fetch('http://localhost:3000/sign', {
-      method: 'POST',
-      body: JSON.stringify(contract.tx.cborHex),
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error! status: ${response.status}`);
-    }
-
-    const result = (await response.json()) as string;
-
-    return result;
-  } catch (error) {
-    console.log('unexpected error: ', error);
-    return 'An unexpected error occurred';
-  }
-}
+console.log("contractId: ", contract.contractId);
+console.log("contractTx: ", contract.tx);
 
 const signed = {
-  cborHex: await signTx(),
+  cborHex: await signTx(contract.tx.cborHex),
   description: contract.tx.description,
   type: contract.tx.type
 };
+
+console.log("Signed contractTx: ", signed);
 
 {
  try {
