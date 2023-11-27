@@ -31,5 +31,5 @@ We also need to have the `sign-tx` service. To install and run it, go to https:/
 After everything is configured, we can use the following command to run the script.
 ```bash
     $ npm install
-    $ npm run test
+    $ npm run deploy-example
 ```
