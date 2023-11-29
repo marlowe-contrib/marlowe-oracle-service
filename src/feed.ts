@@ -7,38 +7,40 @@ type CurrencyPair = {
   to: Currency
 }
 
-
 const KnownCurrencyPairs: { [key: string] : CurrencyPair; } = {
     "Coingecko ADAUSD": { from: 'ADA', to: 'USD'},
-    "Coingeckp USDADA": { from: 'USD', to: 'ADA'},
+    "Coingecko USDADA": { from: 'USD', to: 'ADA'},
 };
 
 async function queryCoingecko(from: string, to: string): Promise<any> {
-    const coingeckoApi = `https://api.coingecko.com/api/v3/simple/price?ids=${from}&vs_currencies=${to}`
-    try {
-        const response = await fetch(coingeckoApi, {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-          },
-        });
-        if (!response.ok) {
-          throw new Error(`Error! status: ${response.status}`);
-        }
-        // Maybe add the parsing of this response here ?
-        // CG API returns :  { base: { quote: price } }
-        const result = (await response.json());
-        return result;
-      } catch (error) {
-        console.log('unexpected error: ', error);
-        return 'An unexpected error occurred';
+  type CoingeckoResponse = {
+    [from: string] : {
+      [to: string] : number
+    }
+  };
+  const coingeckoApi = `https://api.coingecko.com/api/v3/simple/price?ids=${from}&vs_currencies=${to}`;
+  try {
+      const response = await fetch(coingeckoApi, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Error! status: ${response.status}`);
       }
+      const result = (await response.json()) as CoingeckoResponse;
+      return result[from][to];
+    } catch (error) {
+      console.log('unexpected error: ', error);
+      return 'An unexpected error occurred';
+    }
 }
 
 function currencyToCoingecko (c : Currency) : string {
    switch (c) {
-    case 'ADA' : return "CARDANO";
-    case 'USD' : return "USD";
+    case 'ADA' : return "cardano";
+    case 'USD' : return "usd";
    }
 }
 
