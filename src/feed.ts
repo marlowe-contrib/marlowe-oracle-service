@@ -2,8 +2,6 @@ import fetch from "node-fetch";
 import { ContractId } from "@marlowe.io/runtime-core";
 import { ChoiceId, Bound, Input, InputContent, IChoice } from "@marlowe.io/language-core-v1";
 import { ApplyInputsRequest } from "@marlowe.io/runtime-lifecycle/dist/esm/api";
-import { applyDoubleCborEncoding } from "lucid-cardano";
-import { choiceIdCmp } from "@marlowe.io/language-core-v1/dist/esm/choices";
 
 type Currency = 'ADA' | 'USD';
 
