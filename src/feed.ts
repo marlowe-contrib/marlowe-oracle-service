@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import { ContractId, contractId } from "@marlowe.io/runtime-core";
+import { ContractId } from "@marlowe.io/runtime-core";
 import { ChoiceId, Bound, Input, InputContent, IChoice } from "@marlowe.io/language-core-v1";
 import { ApplyInputsRequest } from "@marlowe.io/runtime-lifecycle/dist/esm/api";
 
@@ -64,7 +64,7 @@ function currencyToCoingecko (c : Currency) : string {
     case 'USD' : return "usd";
     default : throw new Error("Unkown currency");
   }
-}
+};
 
 /**
  * Provides the price of a requested currencyPair via Coingecko
@@ -74,25 +74,24 @@ function currencyToCoingecko (c : Currency) : string {
  * @throws ResultIsOutOfBounds
  */
 
-async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound[])
-  : Promise<bigint> {
+async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound[]): Promise<bigint> {
   const from = currencyToCoingecko(curPair.from);
   const to = currencyToCoingecko(curPair.to);
   var scaledResult = 0n;
   if (curPair.from == 'ADA') {
     const result = await queryCoingecko(from, to);
-    scaledResult = BigInt(result * 1_000_000);
+    scaledResult = BigInt(result * 100_000_000);
   }
   else {
     const result = await queryCoingecko(to, from);
-    scaledResult =  BigInt((1 / result) * 1_000_000);
+    scaledResult =  BigInt(Math.round(1 / result * 100_000_000));
   }
   if (withinBounds(scaledResult, bounds)) {
-    return scaledResult
+    return scaledResult;
   } else {
-    throw new Error("Feed result is out of bounds")
+    throw new Error("Feed result is out of bounds");
   }
-}
+};
 
 /**
  * Utility to check if a given number n is within the bounds for at least one element of the array
@@ -102,7 +101,7 @@ async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound[])
  */
 function withinBounds(n: bigint, bounds: Bound[]): Boolean {
  return bounds.some(bound => (n >= bound.from) && (n <= bound.to));
-}
+};
 
 /**
  * Utility to create an IChoice
@@ -118,7 +117,7 @@ function makeInput (cId: ChoiceId, price: bigint): Input {
   const inputContent: InputContent = inputChoice;
   const input: Input = inputContent;
   return input;
-}
+};
 
 type OracleRequest = {
   contractId: ContractId;
@@ -144,9 +143,9 @@ export async function feed(request: OracleRequest): Promise<[ContractId, ApplyIn
     case 'Coingecko':
       price = await getCoingeckoPrice(curPair, request.choiceBounds);
       break;
-    }
+    };
 
-  const input: Input = makeInput(request.choiceId, price) ;
+  const input: Input = makeInput(request.choiceId, price);
 
   const air: ApplyInputsRequest = {
     inputs: [input],
@@ -154,7 +153,7 @@ export async function feed(request: OracleRequest): Promise<[ContractId, ApplyIn
     metadata: {},
     invalidBefore: request.invalidBefore,
     invalidHereafter: request.invalidHereafter
-  }
+  };
 
   return [request.contractId, air];
-}
+};
