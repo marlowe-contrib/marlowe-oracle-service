@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import { ContractId } from "@marlowe.io/runtime-core";
+import { ContractId, contractId } from "@marlowe.io/runtime-core";
 import { ChoiceId, Bound, Input, InputContent, IChoice } from "@marlowe.io/language-core-v1";
 import { ApplyInputsRequest } from "@marlowe.io/runtime-lifecycle/dist/esm/api";
 
@@ -74,7 +74,7 @@ function currencyToCoingecko (c : Currency) : string {
  * @throws ResultIsOutOfBounds
  */
 
-async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound)
+async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound[])
   : Promise<bigint> {
   const from = currencyToCoingecko(curPair.from);
   const to = currencyToCoingecko(curPair.to);
@@ -87,11 +87,21 @@ async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound)
     const result = await queryCoingecko(to, from);
     scaledResult =  BigInt((1 / result) * 1_000_000);
   }
-  if (scaledResult >= bounds.from && scaledResult <= bounds.to) {
+  if (withinBounds(scaledResult, bounds)) {
     return scaledResult
   } else {
     throw new Error("Feed result is out of bounds")
   }
+}
+
+/**
+ * Utility to check if a given number n is within the bounds for at least one element of the array
+ * @param n bigint
+ * @param bounds array of Bound
+ * @returns true if n is within any of the fiven bounds
+ */
+function withinBounds(n: bigint, bounds: Bound[]): Boolean {
+ return bounds.some(bound => (n >= bound.from) && (n <= bound.to));
 }
 
 /**
@@ -113,7 +123,7 @@ function makeInput (cId: ChoiceId, price: bigint): Input {
 type OracleRequest = {
   contractId: ContractId;
   choiceId: ChoiceId;
-  choiceBounds: Bound;
+  choiceBounds: Bound[];
   invalidBefore: Date;
   invalidHereafter: Date;
 };
@@ -148,4 +158,3 @@ export async function feed(request: OracleRequest): Promise<[ContractId, ApplyIn
 
   return [request.contractId, air];
 }
-
