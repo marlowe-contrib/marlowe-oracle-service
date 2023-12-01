@@ -1,7 +1,9 @@
 import fetch from "node-fetch";
 import { ContractId } from "@marlowe.io/runtime-core";
-import { ChoiceId, Bound } from "@marlowe.io/language-core-v1";
+import { ChoiceId, Bound, Input, InputContent, IChoice } from "@marlowe.io/language-core-v1";
 import { ApplyInputsRequest } from "@marlowe.io/runtime-lifecycle/dist/esm/api";
+import { applyDoubleCborEncoding } from "lucid-cardano";
+import { choiceIdCmp } from "@marlowe.io/language-core-v1/dist/esm/choices";
 
 type Currency = 'ADA' | 'USD';
 
@@ -22,9 +24,9 @@ async function queryCoingecko(from: string, to: string): Promise<any> {
       [to: string] : number
     }
   };
-  const coingeckoApi = `https://api.coingecko.com/api/v3/simple/price?ids=${from}&vs_currencies=${to}`;
+  const cgApi =`https://api.coingecko.com/api/v3/simple/price?ids=${from}&vs_currencies=${to}`;
   try {
-    const response = await fetch(coingeckoApi, {
+    const response = await fetch(cgApi, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -49,7 +51,8 @@ function currencyToCoingecko (c : Currency) : string {
   }
 }
 
-async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound) : Promise<any> {
+async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound)
+  : Promise<bigint> {
   const from = currencyToCoingecko(curPair.from);
   const to = currencyToCoingecko(curPair.to);
   var scaledResult = 0n;
@@ -68,6 +71,16 @@ async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound) : Promi
   }
 }
 
+function makeInput (cId: ChoiceId, price: bigint): Input {
+  const inputChoice: IChoice = {
+    for_choice_id: cId,
+    input_that_chooses_num: price
+  }
+  const inputContent: InputContent = inputChoice;
+  const input: Input = inputContent;
+  return input;
+}
+
 type OracleRequest = {
   contractId: ContractId;
   choiceId: ChoiceId;
@@ -76,16 +89,24 @@ type OracleRequest = {
   invalidHereafter: Date;
 };
 
-// Promise<[ContractId, ApplyInputsRequest]>
-export async function feed(request: OracleRequest): Promise<number> {
+export async function feed(request: OracleRequest): Promise<[ContractId, ApplyInputsRequest]> {
   const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
+  let price = 0n;
   switch (curPair.source) {
     case 'Coingecko':
-      const price = getCoingeckoPrice(curPair, request.choiceBounds);
+      price = await getCoingeckoPrice(curPair, request.choiceBounds);
       break;
+    }
+
+  const input: Input = makeInput(request.choiceId, price) ;
+
+  const air: ApplyInputsRequest = {
+    inputs: [input],
+    tags: {},
+    metadata: {},
+    invalidBefore: request.invalidBefore,
+    invalidHereafter: request.invalidHereafter
   }
 
-  // add price to the applyInputs !!
-  // return [request.contractId]
-  return 0;
+  return [request.contractId, air];
 }
