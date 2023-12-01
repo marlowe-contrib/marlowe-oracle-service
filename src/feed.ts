@@ -12,8 +12,8 @@ type CurrencyPair = {
 };
 
 const KnownCurrencyPairs: { [key: string] : CurrencyPair; } = {
-  "Coingecko ADAUSD": { source: "coingecko", from: 'ADA', to: 'USD'},
-  "Coingecko USDADA": { source: "coingecko", from: 'USD', to: 'ADA'},
+  "Coingecko ADAUSD": { source: "Coingecko", from: 'ADA', to: 'USD'},
+  "Coingecko USDADA": { source: "Coingecko", from: 'USD', to: 'ADA'},
 };
 
 async function queryCoingecko(from: string, to: string): Promise<any> {
@@ -56,11 +56,11 @@ async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound)
   var scaledResult = 0n;
   if (curPair.from == 'ADA') {
     const result = await queryCoingecko(from, to);
-    scaledResult = BigInt(result * 100000);
+    scaledResult = BigInt(result * 1_000_000);
   }
   else {
     const result = await queryCoingecko(to, from);
-    scaledResult =  BigInt((1 / result) * 100000);
+    scaledResult =  BigInt((1 / result) * 1_000_000);
   }
   if (scaledResult >= bounds.from && scaledResult <= bounds.to) {
     return scaledResult
@@ -108,3 +108,4 @@ export async function feed(request: OracleRequest): Promise<[ContractId, ApplyIn
 
   return [request.contractId, air];
 }
+
