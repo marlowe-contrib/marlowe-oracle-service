@@ -11,12 +11,23 @@ type CurrencyPair = {
   to: Currency
 };
 
+/**
+ * @description Currency pairs for which information can be provided by the respective sources
+ */
 const KnownCurrencyPairs: { [key: string] : CurrencyPair; } = {
   "Coingecko ADAUSD": { source: "Coingecko", from: 'ADA', to: 'USD'},
   "Coingecko USDADA": { source: "Coingecko", from: 'USD', to: 'ADA'},
 };
 
-async function queryCoingecko(from: string, to: string): Promise<any> {
+/**
+ * Requests the price feed for a currency pair to the CoingeckoApi
+ * @param from base currency
+ * @param to quote currency
+ * @returns price
+ * @throws ResponseError
+ * @throws UnexpectedError
+ */
+async function queryCoingecko(from: string, to: string): Promise<number> {
   type CoingeckoResponse = {
     [from: string] : {
       [to: string] : number
@@ -37,10 +48,16 @@ async function queryCoingecko(from: string, to: string): Promise<any> {
     return result[from][to];
   } catch (error) {
     console.log('unexpected error: ', error);
-    return 'An unexpected error occurred';
+    throw new Error('An unexpected error occurred');
   }
 }
 
+/**
+ * Parsing of a currency to the known Coingecko codes
+ * @param c Currency
+ * @returns string to be used in the coingecko api request
+ * @throws UnknownCurrencyError
+ */
 function currencyToCoingecko (c : Currency) : string {
   switch (c) {
     case 'ADA' : return "cardano";
@@ -48,6 +65,14 @@ function currencyToCoingecko (c : Currency) : string {
     default : throw new Error("Unkown currency");
   }
 }
+
+/**
+ * Provides the price of a requested currencyPair via Coingecko
+ * @param curPair Currency pair for the the desired exchange price
+ * @param bounds Numeric limits that the price has to be confied within
+ * @returns price as a scaled BigInt
+ * @throws ResultIsOutOfBounds
+ */
 
 async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound)
   : Promise<bigint> {
@@ -69,6 +94,12 @@ async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound)
   }
 }
 
+/**
+ * Utility to create an IChoice
+ * @param cId choiceId (choice_name and choice_owner) of the Input
+ * @param price Number that the input chooses
+ * @returns Simple InputContent with an IChoice
+ */
 function makeInput (cId: ChoiceId, price: bigint): Input {
   const inputChoice: IChoice = {
     for_choice_id: cId,
@@ -87,8 +118,17 @@ type OracleRequest = {
   invalidHereafter: Date;
 };
 
+/**
+ * @param request Necessary information about the feed to provide and the Contract
+ * that requires it.
+ * @returns contractId (of the contract that requested input) and ApplyRequestInputs
+ * (complete inputs to be applied to it).
+ * @throws UnkownCurrencyPairOrSourceError
+ */
+
 export async function feed(request: OracleRequest): Promise<[ContractId, ApplyInputsRequest]> {
   const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
+  if (!curPair) throw new Error("Unknown currency pair and/or source");
   let price = 0n;
   switch (curPair.source) {
     case 'Coingecko':
