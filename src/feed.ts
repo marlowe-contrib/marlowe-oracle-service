@@ -67,7 +67,8 @@ function currencyToCoingecko (c : Currency) : string {
 };
 
 /**
- * Provides the price of a requested currencyPair via Coingecko
+ * Provides the price of a requested currencyPair via Coingecko. The price is returned
+ * multiplied by 100_000_000
  * @param curPair Currency pair for the the desired exchange price
  * @param bounds Numeric limits that the price has to be confied within
  * @returns price as a scaled BigInt
