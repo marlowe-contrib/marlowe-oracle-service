@@ -1,5 +1,5 @@
-import { Lucid } from "lucid-cardano"
-import { mkRestClient } from "@marlowe.io/runtime-rest-client";
+import { Lucid } from "lucid-cardano";
+import { mkRestClient } from "marlowe-runtime-rest-client-txpipe";
 
 export async function main() {
     const lucid = await Lucid.new();
