@@ -1,13 +1,15 @@
-import { Lucid } from "lucid-cardano";
-import { mkRestClient } from "marlowe-runtime-rest-client-txpipe";
+
+import { parseMOSConfig, parseMOSEnv } from "./config.ts"
+import { Lucid, MaestroConfig } from "lucid-cardano"
+import { mkRestClient } from "@marlowe.io/runtime-rest-client";
 
 export async function main() {
-    const lucid = await Lucid.new();
-    // let runtimeURL = process.env.MARLOWE_RUNTIME_URL;
-    let runtimeURL = "https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io";
+    const mosConfig = await parseMOSConfig();
+    const mosEnv = parseMOSEnv();
 
-    const client = mkRestClient(runtimeURL);
+    const lucid = await Lucid.new(mosEnv.provider);
+    const client = mkRestClient(mosEnv.marlowe_runtime_url);
+
     const hasValidRuntime = await client.healthcheck();
-
     if (!hasValidRuntime) throw new Error("Invalid Marlowe Runtime instance");
 }

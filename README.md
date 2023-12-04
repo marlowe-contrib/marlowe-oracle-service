@@ -6,10 +6,39 @@ A complete design document can be found [here](./docs/design.md).
 
 ## Run the service
 
+The MOS service requires specific environment variables and a configuration file to be set up prior to starting. The env-vars will contain secret/critical information that also doesn't change too often:
+
+```shell
+export MARLOWE_RUNTIME_URL='COMPLETE ME'
+export SIGN_TX_URL='COMPLETE ME'
+export NETWORK='Preprod'
+```
+
+Besides, we need to include the token or key corresponding to the provider we want to use. Currently, MOS supports Maestro and Blockfrost. We must include one (and only one) of the following environment variables:
+
+```shell
+export MAESTRO_APITOKEN='COMPLETE ME'
+export BLOCKFROST_APIKEY='COMPLETE ME'
+```
+
+The other part of the configuration it's done in the [mos-config.json](./mos-config.json) file that must be given as argument:
+
+```json
+{
+  "delay": 30000,
+  "resolveMethod": "Address",
+  "choiceNames": [
+    "Coingecko ADAUSD"
+  ]
+}
+```
+
+We specify the waiting time of each iteration in milliseconds, the choice resolution method we want to have and finally the list of choice names we are resolving.
+
 Use the following commands to install all the dependencies and then run the service:
 ```bash
     $ npm install
-    $ npm run dev
+    $ npm run dev -- mos-config.json 
 ```
 
 

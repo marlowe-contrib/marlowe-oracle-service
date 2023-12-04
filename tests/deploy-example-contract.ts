@@ -1,13 +1,13 @@
+import { parseMOSEnv } from "../src/config.ts"
 import { signTx } from "../src/tx.ts"
 
 import { mkRestClient } from "marlowe-runtime-rest-client-txpipe";
 import { AddressBech32, addressBech32, contractId } from "@marlowe.io/runtime-core";
 import { Contract } from "@marlowe.io/language-core-v1";
 
-// let runtimeURL = process.env.MARLOWE_RUNTIME_URL;
-let runtimeURL = "https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io";
+const mosEnv = parseMOSEnv();
 
-const client = mkRestClient(runtimeURL);
+const client = mkRestClient(mosEnv.marlowe_runtime_url);
 const hasValidRuntime = await client.healthcheck();
 
 if (!hasValidRuntime) throw new Error("Invalid Marlowe Runtime instance");
@@ -49,7 +49,6 @@ const contractJson: Contract = {
   "timeout_continuation": "close",
   "timeout": getTimeout()
 };
-
 
 // ver tipo: CreateContractRequest
 const request = {
