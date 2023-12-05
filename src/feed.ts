@@ -79,13 +79,17 @@ async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound[]): Prom
   const from = currencyToCoingecko(curPair.from);
   const to = currencyToCoingecko(curPair.to);
   var scaledResult = 0n;
-  if (curPair.from == 'ADA') {
-    const result = await queryCoingecko(from, to);
-    scaledResult = BigInt(result * 100_000_000);
-  }
-  else {
-    const result = await queryCoingecko(to, from);
-    scaledResult =  BigInt(Math.round(1 / result * 100_000_000));
+  switch ([curPair.from, curPair.to]) {
+    case (['ADA', 'USD'] as [Currency, Currency]): {
+      const result = await queryCoingecko(from, to);
+      scaledResult = BigInt(result * 100_000_000);
+      break;
+    }
+    case (['USD', 'ADA'] as [Currency, Currency]): {
+      const result = await queryCoingecko(to, from);
+      scaledResult =  BigInt(Math.round(1 / result * 100_000_000));
+      break;
+    }
   }
   if (withinBounds(scaledResult, bounds)) {
     return scaledResult;
