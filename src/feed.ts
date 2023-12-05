@@ -56,13 +56,11 @@ async function queryCoingecko(from: string, to: string): Promise<number> {
  * Parsing of a currency to the known Coingecko codes
  * @param c Currency
  * @returns string to be used in the coingecko api request
- * @throws UnknownCurrencyError
  */
 function currencyToCoingecko (c : Currency) : string {
   switch (c) {
     case 'ADA' : return "cardano";
     case 'USD' : return "usd";
-    default : throw new Error("Unkown currency");
   }
 };
 
@@ -119,9 +117,7 @@ function makeInput (cId: ChoiceId, price: bigint): Input {
     for_choice_id: cId,
     input_that_chooses_num: price
   }
-  const inputContent: InputContent = inputChoice;
-  const input: Input = inputContent;
-  return input;
+  return inputChoice;
 };
 
 type OracleRequest = {
