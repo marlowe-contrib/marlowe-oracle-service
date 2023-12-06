@@ -23,3 +23,25 @@ export async function signTx(signURL: string, cborHex: string) {
         return 'An unexpected error occurred';
     }
 }
+
+const client = mkRestClient("https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io");
+const hasValidRuntime = await client.healthcheck();
+if (!hasValidRuntime) throw new Error("Invalid Marlowe Runtime instance");
+
+// Maybe this main function could take a list of ApplyInputsToContractRequests ??
+export async function applyInputs(client: RestClient, air: ApplyInputsToContractRequest)
+: Promise<string> {
+    const inputsApplied = await client.applyInputsToContract(air);
+    const signed = {
+        ...inputsApplied,
+        tx: {
+            ...inputsApplied.tx,
+            cborHex: await signTx(inputsApplied.tx.cborHex)
+        }
+    };
+    // const submit = client.submitContractTransaction(
+    //     signed.contractId,
+    //     signed.transactionId);
+
+    return ""
+}
