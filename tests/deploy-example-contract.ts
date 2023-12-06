@@ -1,6 +1,6 @@
 import { signTx } from "../src/tx.ts"
 
-import { mkRestClient } from "@marlowe.io/runtime-rest-client";
+import { mkRestClient } from "marlowe-runtime-rest-client-txpipe";
 import { AddressBech32, addressBech32, contractId } from "@marlowe.io/runtime-core";
 import { Contract } from "@marlowe.io/language-core-v1";
 

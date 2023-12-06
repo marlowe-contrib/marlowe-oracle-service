@@ -24,3 +24,5 @@ typings/
 lib/*.js
 test/*.js
 *.map
+
+.vscode
