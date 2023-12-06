@@ -1,13 +1,30 @@
-import { Lucid } from "lucid-cardano";
-import { mkRestClient } from "marlowe-runtime-rest-client-txpipe";
+import { Lucid, MaestroConfig } from 'lucid-cardano';
+import { ContractId } from '@marlowe.io/runtime-core';
+import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
+import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
+import { Address } from 'marlowe-language-core-v1-txpipe';
+
+import { parseMOSConfig, parseMOSEnv } from './config.ts';
+import { getActiveContracts } from './scan.ts';
+import { getApplyInputs } from './feed.ts';
 
 export async function main() {
-    const lucid = await Lucid.new();
-    // let runtimeURL = process.env.MARLOWE_RUNTIME_URL;
-    let runtimeURL = "https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io";
+    const mosConfig = await parseMOSConfig();
+    const mosEnv = parseMOSEnv();
 
-    const client = mkRestClient(runtimeURL);
-    const hasValidRuntime = await client.healthcheck();
+    const lucid = await Lucid.new(mosEnv.provider);
+    const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 
-    if (!hasValidRuntime) throw new Error("Invalid Marlowe Runtime instance");
+    const mosAddress: Address = {
+        address:
+            'addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9',
+    };
+    const activeContracts = await getActiveContracts(
+        client,
+        mosAddress,
+        mosConfig.choiceNames
+    );
+    const applicableInputs = await getApplyInputs(mosAddress, activeContracts);
+
+    console.log(applicableInputs);
 }

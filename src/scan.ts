@@ -1,5 +1,5 @@
-import { RestClient } from "marlowe-runtime-rest-client-txpipe";
-import { ContractId, addressBech32 } from "@marlowe.io/runtime-core";
+import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
+import { ContractId, addressBech32 } from '@marlowe.io/runtime-core';
 import {
     Address,
     Bound,
@@ -8,17 +8,17 @@ import {
     mkEnvironment,
     Next,
     partyCmp,
-} from "marlowe-language-core-v1-txpipe";
+} from 'marlowe-language-core-v1-txpipe';
 
 import {
     ContractHeader,
     ContractsRange,
     GetContractsRequest,
-} from "marlowe-runtime-rest-client-txpipe/dist/esm/contract";
-import { Option, isSome, none, toUndefined } from "fp-ts/lib/Option.js";
-import { pipe } from "fp-ts/lib/function.js";
-import { isRight, left, match, right } from "fp-ts/lib/Either.js";
-import { CanChoose } from "@marlowe.io/language-core-v1/dist/esm/next/applicables/canChoose";
+} from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract';
+import { Option, isSome, none, toUndefined } from 'fp-ts/lib/Option.js';
+import { pipe } from 'fp-ts/lib/function.js';
+import { isRight, left, match, right } from 'fp-ts/lib/Either.js';
+import { CanChoose } from '@marlowe.io/language-core-v1/dist/esm/next/applicables/canChoose';
 
 /**
  * The OracleRequest type contains the necessary information to identify an
@@ -28,8 +28,8 @@ export type OracleRequest = {
     contractId: ContractId;
     choiceId: ChoiceId;
     choiceBounds: Bound[];
-    validFrom: Date;
-    validUntil: Date;
+    invalidBefore: Date;
+    invalidHereafter: Date;
 };
 
 /**
@@ -70,7 +70,7 @@ async function getAllContracts(
 export async function getActiveContracts(
     client: RestClient,
     mosAddress: Address,
-    validChoiceNames: [ChoiceName]
+    validChoiceNames: ChoiceName[]
 ): Promise<OracleRequest[]> {
     const b32OracleAddr = addressBech32(mosAddress.address);
 
@@ -96,7 +96,7 @@ export async function getActiveContracts(
                 pipe(
                     nextAction,
                     match(
-                        (_) => left("Error on next query"),
+                        (_) => left('Error on next query'),
                         (value: Next) => {
                             const choices =
                                 value.applicable_inputs.choices.filter(
@@ -107,17 +107,17 @@ export async function getActiveContracts(
                                         partyCmp(
                                             elem.for_choice.choice_owner,
                                             mosAddress
-                                        ) === "EqualTo"
+                                        ) === 'EqualTo'
                                 );
                             return !choices?.length
-                                ? left("Empty choices")
+                                ? left('Empty choices')
                                 : right({
                                       contractId: contract.contractId,
                                       choiceId: choices[0].for_choice,
                                       choiceBounds:
                                           choices[0].can_choose_between,
-                                      validFrom: currentTime,
-                                      validUntil: timeAfter5Minutes,
+                                      invalidBefore: currentTime,
+                                      invalidHereafter: timeAfter5Minutes,
                                   });
                         }
                     )

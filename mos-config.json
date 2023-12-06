@@ -1,0 +1,7 @@
+{
+  "delay": 30000,
+  "resolveMethod": "Address",
+  "choiceNames": [
+    "Coingecko ADAUSD"
+  ]
+}

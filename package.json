@@ -1,13 +1,14 @@
 {
   "name": "marlowe-oracle-service",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Service for integrating oracles with Marlowe contracts",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
     "dev": "nodemon ./src/index.ts",
     "build": "tsc",
-    "lint": "./node_modules/.bin/eslint . --ext .ts",
+    "lint-check": "prettier src tests --check --config .prettierrc.json",
+    "lint-write": "prettier src tests --write --config .prettierrc.json",
     "deploy-example": "npx ts-node tests/deploy-example-contract.ts"
   },
   "author": "",
@@ -26,14 +27,18 @@
     "marlowe-runtime-lifecycle-txpipe": "0.2.2-beta",
     "marlowe-runtime-rest-client-txpipe": "0.2.2-beta",
     "@marlowe.io/wallet": "^0.2.0-beta",
+    "commander": "^11.1.0",
     "eslint": "^8.54.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "fp-ts": "^2.16.1",
+    "figlet": "^1.7.0",
     "lucid-cardano": "^0.10.7"
   },
   "devDependencies": {
+    "@types/figlet": "^1.5.8",
     "@typescript-eslint/eslint-plugin": "^6.12.0",
     "nodemon": "^3.0.1",
+    "prettier": "^3.1.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.3.2"
   }
