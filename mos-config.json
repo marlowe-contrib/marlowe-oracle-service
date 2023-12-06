@@ -1,6 +1,6 @@
 {
   "delay": 30000,
-  "resolveMethod": "Role",
+  "resolveMethod": "Address",
   "choiceNames": [
     "Coingecko ADAUSD"
   ]
