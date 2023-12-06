@@ -1,7 +1,8 @@
 import fetch from "node-fetch";
 import { ContractId } from "@marlowe.io/runtime-core";
 import { ChoiceId, Bound, Input, InputContent, IChoice } from "@marlowe.io/language-core-v1";
-import { ApplyInputsRequest } from "@marlowe.io/runtime-lifecycle/dist/esm/api";
+import { ApplyInputsRequest } from "marlowe-runtime-lifecycle-txpipe/dist/esm/api";
+import { OracleRequest } from "./scan.ts"
 
 type Currency = 'ADA' | 'USD';
 
@@ -71,29 +72,34 @@ function currencyToCoingecko (c : Currency) : string {
  * @param bounds Numeric limits that the price has to be confied within
  * @returns price as a scaled BigInt
  * @throws ResultIsOutOfBounds
+ * @throws UnknownCurrencyPair
  */
-
 async function getCoingeckoPrice (curPair : CurrencyPair, bounds: Bound[]): Promise<bigint> {
-  const from = currencyToCoingecko(curPair.from);
-  const to = currencyToCoingecko(curPair.to);
-  var scaledResult = 0n;
-  switch ([curPair.from, curPair.to]) {
-    case (['ADA', 'USD'] as [Currency, Currency]): {
-      const result = await queryCoingecko(from, to);
-      scaledResult = BigInt(result * 100_000_000);
-      break;
+    const from = currencyToCoingecko(curPair.from);
+    const to = currencyToCoingecko(curPair.to);
+    var scaledResult = 0n;
+    const ble = [curPair.from, curPair.to];
+    switch ([curPair.from, curPair.to].join("")) {
+	case ("ADAUSD"): {
+	    const result = await queryCoingecko(from, to);
+	    scaledResult = BigInt(result * 100_000_000);
+	    break;
+	}
+	case ("USDADA"): {
+	    const result = await queryCoingecko(to, from);
+	    scaledResult =  BigInt(Math.round(1 / result * 100_000_000));
+	    break;
+	}
+	default: {
+	    throw new Error("Unknown currency pair");
+	    break;
+	}
     }
-    case (['USD', 'ADA'] as [Currency, Currency]): {
-      const result = await queryCoingecko(to, from);
-      scaledResult =  BigInt(Math.round(1 / result * 100_000_000));
-      break;
+    if (withinBounds(scaledResult, bounds)) {
+	return scaledResult;
+    } else {
+	throw new Error("Feed result is out of bounds");
     }
-  }
-  if (withinBounds(scaledResult, bounds)) {
-    return scaledResult;
-  } else {
-    throw new Error("Feed result is out of bounds");
-  }
 };
 
 /**
@@ -120,14 +126,6 @@ function makeInput (cId: ChoiceId, price: bigint): Input {
   return inputChoice;
 };
 
-type OracleRequest = {
-  contractId: ContractId;
-  choiceId: ChoiceId;
-  choiceBounds: Bound[];
-  invalidBefore: Date;
-  invalidHereafter: Date;
-};
-
 /**
  * @param request Necessary information about the feed to provide and the Contract
  * that requires it.
@@ -135,8 +133,7 @@ type OracleRequest = {
  * (complete inputs to be applied to it).
  * @throws UnkownCurrencyPairOrSourceError
  */
-
-export async function feed(request: OracleRequest): Promise<[ContractId, ApplyInputsRequest]> {
+async function feed(request: OracleRequest): Promise<[ContractId, ApplyInputsRequest]> {
   const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
   if (!curPair) throw new Error("Unknown currency pair and/or source");
   let price = 0n;
@@ -158,3 +155,8 @@ export async function feed(request: OracleRequest): Promise<[ContractId, ApplyIn
 
   return [request.contractId, air];
 };
+
+export async function getApplyInputs(requests: OracleRequest[]): Promise<PromiseSettledResult<[ContractId, ApplyInputsRequest]>[]> {
+    const feeds = requests.map(feed);
+    return Promise.allSettled(feeds);
+}

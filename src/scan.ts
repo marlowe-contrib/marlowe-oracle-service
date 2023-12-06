@@ -28,8 +28,8 @@ export type OracleRequest = {
     contractId: ContractId;
     choiceId: ChoiceId;
     choiceBounds: Bound[];
-    validFrom: Date;
-    validUntil: Date;
+    invalidBefore: Date;
+    invalidHereafter: Date;
 };
 
 /**
@@ -70,7 +70,7 @@ async function getAllContracts(
 export async function getActiveContracts(
     client: RestClient,
     mosAddress: Address,
-    validChoiceNames: [ChoiceName]
+    validChoiceNames: ChoiceName[]
 ): Promise<OracleRequest[]> {
     const b32OracleAddr = addressBech32(mosAddress.address);
 
@@ -116,8 +116,8 @@ export async function getActiveContracts(
                                       choiceId: choices[0].for_choice,
                                       choiceBounds:
                                           choices[0].can_choose_between,
-                                      validFrom: currentTime,
-                                      validUntil: timeAfter5Minutes,
+                                      invalidBefore: currentTime,
+                                      invalidHereafter: timeAfter5Minutes,
                                   });
                         }
                     )

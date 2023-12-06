@@ -6,19 +6,11 @@ import { AddressBech32, addressBech32, contractId } from "@marlowe.io/runtime-co
 import { Contract } from "@marlowe.io/language-core-v1";
 
 const mosEnv = parseMOSEnv();
+const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 
-const client = mkRestClient(mosEnv.marlowe_runtime_url);
-const hasValidRuntime = await client.healthcheck();
-
-if (!hasValidRuntime) throw new Error("Invalid Marlowe Runtime instance");
-
-// CHANGE HERE !!
-const choice_owner = "this should be the oracle services address";
-
-const choice_name = "ADAUSD";
-
-// CHANGE HERE !!
-const changeAddress: AddressBech32 = addressBech32("your_address");
+const choice_name = "Coingecko ADAUSD";
+const choice_owner = "COMPLETE ME";
+const changeAddress: AddressBech32 = addressBech32("COMPLETE ME");
 
 function getTimeout(): bigint {
   const date = new Date();
@@ -39,8 +31,8 @@ const contractJson: Contract = {
         },
         "choose_between": [
           {
-            "to": 100000n,
-            "from": 0n
+            "to": 100000000n,
+            "from": 10000000n
           }
         ]
       }
@@ -50,7 +42,6 @@ const contractJson: Contract = {
   "timeout": getTimeout()
 };
 
-// ver tipo: CreateContractRequest
 const request = {
   "changeAddress": changeAddress,
   "contract": contractJson,
@@ -66,9 +57,9 @@ console.log("contractId: ", contract.contractId);
 console.log("contractTx: ", contract.tx);
 
 const signed = {
-  cborHex: await signTx(contract.tx.cborHex),
-  description: contract.tx.description,
-  type: contract.tx.type
+    cborHex: await signTx(mosEnv.signTxUrl, contract.tx.cborHex),
+    description: contract.tx.description,
+    type: contract.tx.type
 };
 
 console.log("Signed contractTx: ", signed);

@@ -1,8 +1,8 @@
 import fetch from "node-fetch";
 
-export async function signTx(cborHex : string) {
+export async function signTx(signURL: string, cborHex: string) {
   try {
-    const response = await fetch('http://localhost:3000/sign', {
+    const response = await fetch(signURL, {
       method: 'POST',
       body: JSON.stringify(cborHex),
       headers: {

@@ -3,6 +3,8 @@ import { readFileSync } from "fs";
 import { Command } from "commander";
 import figlet from "figlet";
 
+import { ChoiceName } from "marlowe-language-core-v1-txpipe";
+
 import { Network, Provider, Maestro, Blockfrost, MaestroSupportedNetworks } from "lucid-cardano"
 
 type ResolveMethod = 'All' | 'Address' | 'Role';
@@ -12,9 +14,9 @@ type ResolveMethod = 'All' | 'Address' | 'Role';
  * Specifies delay (milliseconds), resolution method, and choice names.
  */
 type MOSConfig = {
-  delay: number;
-  resolveMethod: ResolveMethod;
-  choiceNames: string[];
+    delay: number;
+    resolveMethod: ResolveMethod;
+    choiceNames: ChoiceName[];
 }
 
 /**
@@ -23,10 +25,10 @@ type MOSConfig = {
  * provider details for the service.
  */
 type MOSEnv = {
-  marlowe_runtime_url: string;
-  sign_tx_url: string;
-  network: Network;
-  provider: Provider;
+    marloweRuntimeUrl: string;
+    signTxUrl: string;
+    network: Network;
+    provider: Provider;
 }
 
 /**
@@ -44,8 +46,8 @@ function getMOSEnv() : MOSEnv {
     const provider = getProviderEnvValue(network as Network);
 
     return {
-	marlowe_runtime_url: mrUrl,
-	sign_tx_url: signUrl,
+	marloweRuntimeUrl: mrUrl,
+	signTxUrl: signUrl,
 	network: network as Network,
 	provider: provider,
     };
