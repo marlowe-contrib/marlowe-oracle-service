@@ -7,6 +7,7 @@ import { Address } from 'marlowe-language-core-v1-txpipe';
 import { parseMOSConfig, parseMOSEnv } from './config.ts';
 import { getActiveContracts } from './scan.ts';
 import { getApplyInputs } from './feed.ts';
+import { getTx } from './tx.ts';
 
 export async function main() {
     const mosConfig = await parseMOSConfig();
@@ -25,6 +26,7 @@ export async function main() {
         mosConfig.choiceNames
     );
     const applicableInputs = await getApplyInputs(mosAddress, activeContracts);
-
+    const tx = await getTx(mosEnv.signTxUrl, client, lucid, applicableInputs);
     console.log(applicableInputs);
+
 }

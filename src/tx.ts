@@ -1,4 +1,7 @@
 import fetch from 'node-fetch';
+import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
+import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
+import { Lucid } from 'lucid-cardano';
 
 export async function signTx(signURL: string, cborHex: string) {
     try {
@@ -24,24 +27,14 @@ export async function signTx(signURL: string, cborHex: string) {
     }
 }
 
-const client = mkRestClient("https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io");
-const hasValidRuntime = await client.healthcheck();
-if (!hasValidRuntime) throw new Error("Invalid Marlowe Runtime instance");
-
-// Maybe this main function could take a list of ApplyInputsToContractRequests ??
-export async function applyInputs(client: RestClient, air: ApplyInputsToContractRequest)
+export async function getTx(signTxUrl: string, client: RestClient, lucid: Lucid, applicableInputs: ApplyInputsToContractRequest[])
 : Promise<string> {
-    const inputsApplied = await client.applyInputsToContract(air);
-    const signed = {
-        ...inputsApplied,
-        tx: {
-            ...inputsApplied.tx,
-            cborHex: await signTx(inputsApplied.tx.cborHex)
-        }
-    };
-    // const submit = client.submitContractTransaction(
-    //     signed.contractId,
-    //     signed.transactionId);
+    const inputsApplied = await client.applyInputsToContract(applicableInputs[0]);
+    console.log(applicableInputs[0].contractId)
+    console.log("unsigned cbor", inputsApplied.tx.cborHex)
+    const signedCbor = await signTx(signTxUrl, inputsApplied.tx.cborHex);
 
-    return ""
+    const submit = await lucid.provider.submitTx(signedCbor);
+
+    return submit;
 }
