@@ -14,13 +14,15 @@ const mosEnv = parseMOSEnv();
 const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 
 const choice_name = 'Coingecko ADAUSD';
-const choice_owner = 'COMPLETE ME';
-const changeAddress: AddressBech32 = addressBech32('COMPLETE ME');
+const choice_owner = 'addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9';
+const changeAddress: AddressBech32 = addressBech32('addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9');
 
 function getTimeout(): bigint {
     const date = new Date();
-    date.setDate(date.getMonth() + 1);
-    return BigInt(date.getTime());
+    const timeout = new Date(
+        date.getTime() + 60 * 60 * 1000
+    );
+    return BigInt(timeout.getTime());
 }
 
 const contractJson: Contract = {
@@ -37,7 +39,7 @@ const contractJson: Contract = {
                 choose_between: [
                     {
                         to: 100000000n,
-                        from: 10000000n,
+                        from: 100n,
                     },
                 ],
             },
@@ -72,7 +74,7 @@ console.log('Signed contractTx: ', signed);
 {
     try {
         const result = await client.submitContract(contract.contractId, signed);
-        console.log(result);
+        console.log(await result);
     } catch (error) {
         console.log(error);
         throw new Error('Submition failed');
