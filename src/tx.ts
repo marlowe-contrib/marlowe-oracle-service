@@ -34,23 +34,27 @@ export async function buildAndSubmit(
     lucid: Lucid,
     applicableInputs: ApplyInputsToContractRequest[]
 ): Promise<string> {
-    try {
-        const appliedInput = await client.applyInputsToContract(
-            applicableInputs[0]
-        );
-        const signedCbor = await signTx(signTxUrl, appliedInput.tx.cborHex);
-        const txHash = await lucid.provider.submitTx(signedCbor);
-        return txHash;
-    } catch (error) {
-        if (axios.isAxiosError(error)) {
-            const e = error as AxiosError;
-            console.error(
-                'Axios error occurred: ' + e.response?.statusText.toString()
-            );
-            console.error(e.response?.data);
-        } else {
-            console.error('Unexpected error occurred', error);
-        }
-        return 'Error occurred';
+    if (applicableInputs.length > 0) {
+        try {
+            const appliedInput = await client.applyInputsToContract(
+                applicableInputs[0]
+                );
+                const signedCbor = await signTx(signTxUrl, appliedInput.tx.cborHex);
+                const txHash = await lucid.provider.submitTx(signedCbor);
+                return txHash;
+            } catch (error) {
+                if (axios.isAxiosError(error)) {
+                    const e = error as AxiosError;
+                    console.error(
+                        'Axios error occurred: ' + e.response?.statusText.toString()
+                        );
+                        console.error(e.response?.data);
+                    } else {
+                        console.error('Unexpected error occurred', error);
+                    }
+                    return 'Error occurred';
+                }
+    } else {
+        return 'No inputs to apply';
     }
 }
