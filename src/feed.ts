@@ -155,7 +155,7 @@ async function getCoingeckoPrice(
     switch ([curPair.from, curPair.to].join('')) {
         case 'ADAUSD': {
             const result = await queryCoingecko(from, to);
-            scaledResult = BigInt(result * 100_000_000);
+            scaledResult = BigInt(Math.round(result * 100_000_000));
             break;
         }
         case 'USDADA': {
