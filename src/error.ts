@@ -2,7 +2,7 @@
  * Base class for custom Error objects
  */
 export class BaseError<T extends string> extends Error {
-    name:T;
+    name: T;
     message!: string;
 
     constructor(name: T, message?: string) {
@@ -18,12 +18,29 @@ export class BaseError<T extends string> extends Error {
 /**
  *  Errors from the config module.
  */
-export class ConfigError extends BaseError<ConfigErrorNames> { }
+export class ConfigError extends BaseError<ConfigErrorNames> {}
 
 type ConfigErrorNames =
-      'MissingEnvironmentVariable'
+    | 'MissingEnvironmentVariable'
     | 'MissingProviderEnvironmentVariable'
     | 'MoreThanOneProviderVariable'
     | 'UnknownNetwork'
-    | 'ErrorFetchingOrParsingJSON'
+    | 'ErrorFetchingOrParsingJSON';
 
+/**
+ *  Errors from the feed module.
+ */
+export class FeedError extends BaseError<FeedErrorNames> {}
+
+type FeedErrorNames =
+    | 'UnknownCurrencyPair'
+    | 'UnknownCurrencyPairOrSource'
+    | 'FeedResultIsOutOfBounds'
+    | 'UnknownBaseOrQuoteCurrencyForCGQuery';
+
+export class RequestError extends BaseError<string> {
+    constructor(name: string, message: string) {
+        super(name, message);
+        Object.setPrototypeOf(this, RequestError.prototype);
+    }
+}
