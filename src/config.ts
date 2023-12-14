@@ -12,6 +12,8 @@ import {
     MaestroSupportedNetworks,
 } from 'lucid-cardano';
 
+import { ConfigError } from './error.ts';
+
 type ResolveMethod = 'All' | 'Address' | 'Role';
 
 /**
@@ -75,7 +77,7 @@ export function parseMOSEnv(): MOSEnv {
 
     for (const [key, value] of Object.entries(mosEnv)) {
         if (providers.includes(key.toString()) || value === undefined) {
-            throw new Error(`Missing environment variable: ${key}`);
+            throw new ConfigError('MissingEnvironmentVariable', key);
         }
     }
 
@@ -126,7 +128,7 @@ export async function parseMOSConfig(): Promise<MOSConfig> {
  */
 function getEnvValue(key: string): string {
     if (process.env[key] === undefined) {
-        throw new Error(`Missing environment variable: ${key}`);
+        throw new ConfigError('MissingEnvironmentVariable', key);
     }
     return process.env[key] as string;
 }
@@ -146,7 +148,7 @@ function networkToBlockfrostUrl(network: Network): string {
     } else if (network === 'Preview') {
         url = 'https://cardano-preview.blockfrost.io/api/v0';
     } else {
-        throw new Error(`Unknown network: ${network}`);
+        throw new ConfigError('UnknownNetwork', network);
     }
     return url;
 }
@@ -166,7 +168,7 @@ function getProviderEnvValue(network: Network): Provider {
     ];
 
     if (tokens.filter((t) => t !== undefined).length > 1) {
-        throw new Error(`More than one provider environment variable`);
+        throw new ConfigError('MoreThanOneProviderVariable');
     } else if (maestroApiToken !== undefined) {
         return new Maestro({
             network: network as MaestroSupportedNetworks,
@@ -179,9 +181,7 @@ function getProviderEnvValue(network: Network): Provider {
             blockfrostApiKey
         );
     } else {
-        throw new Error(
-            `Missing provider environment variable: MAESTRO_APITOKEN or BLOCKFROST_APIKEY`
-        );
+        throw new ConfigError('MissingProviderEnvironmentVariable','MAESTRO_APITOKEN or BLOCKFROST_APIKEY');
     }
 }
 
@@ -200,6 +200,6 @@ async function fromFileMOSConfig(filePath: string): Promise<MOSConfig> {
         return parsedData;
     } catch (error) {
         console.error('Error fetching or parsing JSON:', error);
-        throw error;
+        throw new ConfigError('ErrorFetchingOrParsingJSON');
     }
 }
