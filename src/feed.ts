@@ -1,14 +1,9 @@
 import fetch from 'node-fetch';
-import {
-    AddressBech32,
-    addressBech32,
-    ContractId,
-} from '@marlowe.io/runtime-core';
+import { addressBech32 } from '@marlowe.io/runtime-core';
 import {
     ChoiceId,
     Bound,
     Input,
-    InputContent,
     IChoice,
 } from '@marlowe.io/language-core-v1';
 import { Address } from 'marlowe-language-core-v1-txpipe';
@@ -108,7 +103,7 @@ async function queryCoingecko(from: string, to: string): Promise<number> {
             [to: string]: number;
         };
     };
-    const cgApi = `https://api.coingecko.com/api/v3/smple/price?ids=cardano&vs_currencies=usd`;
+    const cgApi = `https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd`;
     const response = await fetch(cgApi, {
         method: 'GET',
         headers: {
