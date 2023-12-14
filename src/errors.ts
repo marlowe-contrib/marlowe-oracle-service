@@ -1,35 +1,29 @@
+/**
+ * Base class for custom Error objects
+ */
 export class BaseError<T extends string> extends Error {
     name:T;
+    message!: string;
 
-    constructor(name:T) {
+    constructor(name: T, message?: string) {
         super();
         this.name = name;
+        if (message) {
+            this.message = message;
+        }
         Object.setPrototypeOf(this, BaseError.prototype);
     }
 }
 
-type EnvVariables = 'MARLOWE_RUNTIME_URL'
-                | 'SIGN_TX_URL'
-                | 'NETWORK'
-                | 'MAESTRO_API_TOKEN'
-                | 'BLOCKFROST_API_KEY'
+/**
+ *  Errors from the config module.
+ */
+export class ConfigError extends BaseError<ConfigErrorNames> { }
 
-export class EnvironmentVariableError extends BaseError<EnvVariables> {
-    message: string;
-    constructor(name:EnvVariables) {
-        super(name);
-        this.message = 'Missing the following environment variable: ' + name;
-        Object.setPrototypeOf(this, EnvironmentVariableError.prototype);
-    }
- }
+type ConfigErrorNames =
+      'MissingEnvironmentVariable'
+    | 'MissingProviderEnvironmentVariable'
+    | 'MoreThanOneProviderVariable'
+    | 'UnknownNetwork'
+    | 'ErrorFetchingOrParsingJSON'
 
-try {
-    throw new EnvironmentVariableError('MARLOWE_RUNTIME_URL');
-} catch (e) {
-    if (e instanceof EnvironmentVariableError) {
-        console.log(e.message);
-    } else {
-        console.log("not custom error")
-
-    }
-}
