@@ -11,7 +11,8 @@ export async function main() {
     const mosConfig = await parseMOSConfig();
     const mosEnv = parseMOSEnv();
 
-    const lucid = await Lucid.new(mosEnv.provider);
+    const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
+    lucid.selectWalletFromPrivateKey('COMPLETE ME');
     const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 
     const mosAddress: Address = {
@@ -24,18 +25,15 @@ export async function main() {
             client,
             mosAddress,
             mosConfig.choiceNames
-            );
+        );
 
-        const applicableInputs = await getApplyInputs(mosAddress, activeContracts);
+        const applicableInputs = await getApplyInputs(
+            mosAddress,
+            activeContracts
+        );
         console.log(applicableInputs);
-        const txHash = await buildAndSubmit(
-            mosEnv.signTxUrl,
-            client,
-            lucid,
-            applicableInputs
-            );
-        console.log("TxHash: ", txHash);
-        await new Promise(r => setTimeout(r, mosConfig.delay));
-    } while (true)
-
+        const txHash = await buildAndSubmit(client, lucid, applicableInputs);
+        console.log('TxHash: ', txHash);
+        await new Promise((r) => setTimeout(r, mosConfig.delay));
+    } while (true);
 }
