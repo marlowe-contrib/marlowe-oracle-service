@@ -204,6 +204,3 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
     };
     return inputChoice;
 }
-
-
-const result = queryCoingecko("ADA", "USD");
