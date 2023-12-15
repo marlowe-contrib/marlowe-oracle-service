@@ -114,10 +114,14 @@ async function queryCoingecko(from: string, to: string): Promise<number> {
         throw new RequestError(`${response.statusText}`, `${response.status}`);
     }
     const result = (await response.json()) as CoingeckoResponse;
-    if (result[from][to]) {
-        return result[from][to];
+    if (result[from]) {
+        if (result[from][to]) {
+            return result[from][to];
+        } else {
+            throw new FeedError('UnknownQuoteCurrencyForCGQuery');
+        }
     } else {
-        throw new FeedError('UnknownBaseOrQuoteCurrencyForCGQuery');
+        throw new FeedError('UnknownBaseCurrencyForCGQuery');
     }
 }
 
@@ -200,3 +204,6 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
     };
     return inputChoice;
 }
+
+
+const result = queryCoingecko("ADA", "USD");

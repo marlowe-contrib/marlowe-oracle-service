@@ -36,7 +36,8 @@ type FeedErrorNames =
     | 'UnknownCurrencyPair'
     | 'UnknownCurrencyPairOrSource'
     | 'FeedResultIsOutOfBounds'
-    | 'UnknownBaseOrQuoteCurrencyForCGQuery';
+    | 'UnknownBaseCurrencyForCGQuery'
+    | 'UnknownQuoteCurrencyForCGQuery';
 
 export class RequestError extends BaseError<string> {
     constructor(name: string, message: string) {
