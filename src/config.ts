@@ -3,7 +3,6 @@ import { Command } from 'commander';
 import figlet from 'figlet';
 
 import { Address, ChoiceName } from 'marlowe-language-core-v1-txpipe';
-
 import {
     Network,
     Provider,
@@ -18,6 +17,7 @@ import {
 } from 'lucid-cardano';
 
 import { ConfigError } from './error.ts';
+import { configLogger } from './logger.ts';
 
 /**
  * Configuration for decentralized oracles method.
@@ -87,7 +87,9 @@ export type MOSEnv<T> = {
  * - SIGNING_KEY
  * - MARLOWE_VALIDATOR_ADDRESS
  * - MARLOWE_VALIDATOR_UTXO_REF
+ * - APPLY_URL
  * @returns Marlowe Oracle Service environment configuration
+ * @throws ConfigError InvalidUTxORefForMarloweValidator
  */
 function getMOSEnv(): MOSEnv<OutRef> {
     const mrUrl = getEnvValue('MARLOWE_RUNTIME_URL');
@@ -127,8 +129,9 @@ function getMOSEnv(): MOSEnv<OutRef> {
  * - SIGNING_KEY
  * - MARLOWE_VALIDATOR_ADDRESS
  * - MARLOWE_VALIDATOR_UTXO_REF
+ * - APPLY_URL
  * @returns Marlowe Oracle Service validated environment configuration
- * @throws Error
+ * @throws ConfigError MissingEnvironmentVariable
  */
 export function parseMOSEnv(): MOSEnv<OutRef> {
     const mosEnv = getMOSEnv();
@@ -147,7 +150,6 @@ export function parseMOSEnv(): MOSEnv<OutRef> {
  * Parses the Marlowe Oracle Service configuration from a file.
  * @param filePath The path to the Marlowe Oracle Service configuration file.
  * @returns A promise resolving to the parsed MOS configuration.
- * @throws Error Throws an error if there's an issue reading or parsing the file.
  */
 export async function parseMOSConfig(): Promise<MOSConfig<OutRef>> {
     let args = '';
@@ -171,7 +173,7 @@ export async function parseMOSConfig(): Promise<MOSConfig<OutRef>> {
     try {
         program.parse(process.argv);
     } catch (error) {
-        console.log(error);
+        configLogger.error(error);
     }
 
     return fromFileMOSConfig(args);
@@ -183,7 +185,7 @@ export async function parseMOSConfig(): Promise<MOSConfig<OutRef>> {
  * Retrieves the value of the specified environment variable.
  * @param key The name of the environment variable to retrieve.
  * @returns The value of the specified environment variable.
- * @throws Error Throws an error if the specified environment variable is missing.
+ * @throws ConfigError MissingEnvironmentVariable
  */
 function getEnvValue(key: string): string {
     if (process.env[key] === undefined) {
@@ -196,7 +198,7 @@ function getEnvValue(key: string): string {
  * Generates the Blockfrost API URL based on the specified network.
  * @param network The network for which the Blockfrost API URL is required.
  * @returns The Blockfrost API URL corresponding to the given network.
- * @throws Error Throws an error if the provided network is unknown.
+ * @throws ConfigError UnknownNetwork
  */
 function networkToBlockfrostUrl(network: Network): string {
     let url = '';
@@ -216,7 +218,8 @@ function networkToBlockfrostUrl(network: Network): string {
  * Creates the provider based on the specified network from environment variables.
  * @param network The network for which the provider needs to be determined.
  * @returns The provider instance based on the provided network.
- * @throws Error Throws an error if there are conflicting or missing provider environment variables.
+ * @throws ConfigError MoreThanOneProviderVariable
+ * @throws ConfigError MissingProviderEnvironmentVariable
  */
 function getProviderEnvValue(network: Network): Provider {
     const maestroApiToken = process.env.MAESTRO_APITOKEN;
@@ -251,7 +254,8 @@ function getProviderEnvValue(network: Network): Provider {
  * Parses the Marlowe Oracle Service configuration from a file path.
  * @param filePath The path to the Marlowe Oracle Service configuration file.
  * @returns A promise resolving to the parsed MOS configuration.
- * @throws Error Throws an error if there's an issue reading or parsing the file.
+ * @throws Error NoResolveMethodDefined
+ * @throws Error ErrorFetchingOrParsingJSON
  */
 async function fromFileMOSConfig(filePath: string): Promise<MOSConfig<OutRef>> {
     try {
@@ -267,11 +271,21 @@ async function fromFileMOSConfig(filePath: string): Promise<MOSConfig<OutRef>> {
 
         return parsedData;
     } catch (error) {
-        console.error('Error fetching or parsing JSON:', error);
+        configLogger.error('Error fetching or parsing JSON:', error);
         throw new ConfigError('ErrorFetchingOrParsingJSON');
     }
 }
 
+/**
+ * Retrieves a UTxO (Unspent Transaction Output) based on the provided OutRef and address criteria.
+ * The UTxO must contain a script reference that matches the provided address.
+ * @param lucid The Lucid object used for interacting with the system.
+ * @param utxoRef The OutRef specifying the Unspent Transaction Output reference.
+ * @param address The address to match with the calculated address from the UTxO's scriptRef.
+ * @returns A Promise resolving to the UTxO that meets the criteria.
+ * @throws ConfigError UTxONotFound
+ * @throws ConfigError CalculatedValidatorAddressDoesNotMatchGivenOne
+ */
 async function getUTxOWithScriptRef(
     lucid: Lucid,
     utxoRef: OutRef,
@@ -291,6 +305,12 @@ async function getUTxOWithScriptRef(
     return utxo;
 }
 
+/**
+ * Sets the Oracle configuration in the MOSConfig by retrieving the bridge UTxO if needed.
+ * @param mc The MOSConfig containing the Oracle configuration with OutRefs.
+ * @param lucid The Lucid object used for interacting with the system.
+ * @returns A Promise resolving to the updated MOSConfig with UTxO.
+ */
 export async function setOracleConfig(
     mc: MOSConfig<OutRef>,
     lucid: Lucid
@@ -317,6 +337,12 @@ export async function setOracleConfig(
     }
 }
 
+/**
+ * Sets the Marlowe UTxO within the MOSEnv by retrieving the Marlowe validator UTxO.
+ * @param mosenv The MOSEnv containing Marlowe-specific UTxO references.
+ * @param lucid The Lucid object used for interacting with the system.
+ * @returns A Promise resolving to the updated MOSEnv with UTxO.
+ */
 export async function setMarloweUTxO(
     mosenv: MOSEnv<OutRef>,
     lucid: Lucid
