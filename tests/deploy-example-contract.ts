@@ -2,11 +2,7 @@ import { parseMOSEnv } from '../src/config.ts';
 import { signTx } from '../src/tx.ts';
 
 import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
-import {
-    AddressBech32,
-    addressBech32,
-    contractId,
-} from '@marlowe.io/runtime-core';
+import { AddressBech32, addressBech32 } from '@marlowe.io/runtime-core';
 import { Contract } from '@marlowe.io/language-core-v1';
 import { CreateContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/index';
 
@@ -26,20 +22,28 @@ function getTimeout(): bigint {
 const contractJson: Contract = {
     when: [
         {
-            then: 'close',
-            case: {
-                for_choice: {
-                    choice_owner: {
-                        address: choice_owner,
-                    },
-                    choice_name: choice_name,
-                },
-                choose_between: [
+            then: {
+                when: [
                     {
-                        to: 100000000n,
-                        from: 100n,
+                        then: 'close',
+                        case: {
+                            for_choice: {
+                                choice_owner: { address: choice_owner },
+                                choice_name: 'Coingecko USDADA',
+                            },
+                            choose_between: [{ to: 100000000000n, from: 100n }],
+                        },
                     },
                 ],
+                timeout_continuation: 'close',
+                timeout: getTimeout(),
+            },
+            case: {
+                for_choice: {
+                    choice_owner: { address: choice_owner },
+                    choice_name: choice_name,
+                },
+                choose_between: [{ to: 100000000000n, from: 100n }],
             },
         },
     ],
