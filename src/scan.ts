@@ -61,10 +61,10 @@ async function getAllContracts(
         if (axios.isAxiosError(error)) {
             const e = error as AxiosError;
             if (e.response) {
-                const errorCode = e.response?.status;
-                const errorName = e.response?.statusText;
+                const errorName = e.response?.status;
+                const errorStatus = e.response?.statusText;
                 const errorMessage = e.response?.data;
-                throw new RequestError(`${errorCode}`, errorName, errorMessage);
+                throw new RequestError(`${errorName}`, errorStatus, errorMessage);
             }
         } else {
             throw new ScanError('UnknownError');

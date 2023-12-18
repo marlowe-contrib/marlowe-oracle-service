@@ -15,6 +15,8 @@ import {
     valueToAssets,
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
+import { BuildTransactionError, RequestError } from './error.ts';
+import { error } from 'fp-ts/lib/Console';
 
 /**
  * Send an unsigned transaction to the signing service.
@@ -24,27 +26,22 @@ import axios, { AxiosError } from 'axios';
  * @returns Signed transaction
  */
 export async function signTx(signURL: string, cborHex: string) {
-    try {
-        const response = await fetch(signURL, {
-            method: 'POST',
-            body: JSON.stringify(cborHex),
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-            },
-        });
+    const response = await fetch(signURL, {
+        method: 'POST',
+        body: JSON.stringify(cborHex),
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        },
+    });
 
-        if (!response.ok) {
-            throw new Error(`Error! status: ${response.status}`);
-        }
-
-        const result = (await response.json()) as string;
-
-        return result;
-    } catch (error) {
-        console.log('unexpected error: ', error);
-        return 'An unexpected error occurred';
+    if (!response.ok) {
+        throw new RequestError(`${response.status}`, response.statusText);
     }
+
+    const result = (await response.json()) as string;
+
+    return result;
 }
 
 /**
