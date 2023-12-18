@@ -61,12 +61,13 @@ async function getAllContracts(
         if (axios.isAxiosError(error)) {
             const e = error as AxiosError;
             if (e.response) {
+                const errorCode = e.response?.status;
                 const errorName = e.response?.statusText;
                 const errorMessage = e.response?.data;
-                throw new RequestError('Axios error', errorName, errorMessage);
+                throw new RequestError(`${errorCode}`, errorName, errorMessage);
             }
         } else {
-            throw new ScanError(error as string);
+            throw new ScanError('UnknownError');
         }
     }
 
@@ -95,7 +96,20 @@ export async function getActiveContracts(
         partyAddresses: [b32OracleAddr],
     };
 
-    const allResponses = await getAllContracts(client, contractsRequest);
+    let allResponses: ContractHeader[] = [];
+    try {
+        allResponses = await getAllContracts(client, contractsRequest);
+    } catch (e) {
+        if (e instanceof RequestError) {
+            if (e.name = '404') {
+                throw new ScanError('404', e.message);
+            } else {
+                console.log(e.name, e.message, e.extra);
+            }
+        } else {
+            throw new ScanError('UnknownError');
+        }
+    }
 
     const currentTime: Date = new Date();
     const timeAfter5Minutes: Date = new Date(
