@@ -20,6 +20,9 @@ import { pipe } from 'fp-ts/lib/function.js';
 import { isRight, left, match, right } from 'fp-ts/lib/Either.js';
 import { CanChoose } from '@marlowe.io/language-core-v1/dist/esm/next/applicables/canChoose';
 
+import axios, { AxiosError } from 'axios';
+import { RequestError, ScanError } from './error.ts';
+
 /**
  * The OracleRequest type contains the necessary information to identify an
  * IChoice action that needs to be resolved.
@@ -46,12 +49,26 @@ async function getAllContracts(
     let allResponses: ContractHeader[] = [];
     let cursor: Option<ContractsRange> = none;
 
-    do {
-        request.range = pipe(cursor, toUndefined);
-        const response = await client.getContracts(request);
-        allResponses = allResponses.concat(response.headers);
-        cursor = response.nextRange;
-    } while (isSome(cursor));
+    try {
+        do {
+            request.range = pipe(cursor, toUndefined);
+            const response = await client.getContracts(request);
+            allResponses = allResponses.concat(response.headers);
+            cursor = response.nextRange;
+        } while (isSome(cursor));
+
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            const e = error as AxiosError;
+            if (e.response) {
+                const errorName = e.response?.statusText;
+                const errorMessage = e.response?.data;
+                throw new RequestError('Axios error', errorName, errorMessage);
+            }
+        } else {
+            throw new ScanError(error as string);
+        }
+    }
 
     return allResponses;
 }
