@@ -35,14 +35,20 @@ export class ScanError extends BaseError<string> {}
 /**
  *  Errors from the feed module.
  */
-export class FeedError extends BaseError<FeedErrorNames> {}
+export class FeedError extends BaseError<FeedErrorNames> {
+    constructor(name: FeedErrorNames, message?: string) {
+        super(name, message);
+        Object.setPrototypeOf(this, RequestError.prototype);
+    }
+}
 
 type FeedErrorNames =
     | 'UnknownCurrencyPair'
     | 'UnknownCurrencyPairOrSource'
     | 'FeedResultIsOutOfBounds'
     | 'UnknownBaseCurrencyForCGQuery'
-    | 'UnknownQuoteCurrencyForCGQuery';
+    | 'UnknownQuoteCurrencyForCGQuery'
+    | 'UnknownError';
 
 export class RequestError extends BaseError<string> {
     extra!: unknown;

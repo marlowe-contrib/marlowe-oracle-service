@@ -72,21 +72,30 @@ export async function getApplyInputs(
  * @throws FeedError UnkownCurrencyPairOrSource
  */
 async function feed(request: OracleRequest): Promise<Input> {
-    const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
-    if (!curPair)
-        throw new FeedError(
-            'UnknownCurrencyPairOrSource',
-            request.choiceId.choice_name
-        );
-    let price = 0n;
-    switch (curPair.source) {
-        case 'Coingecko':
-            price = await getCoingeckoPrice(curPair, request.choiceBounds);
-            break;
-    }
+    try {
+        const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
+        if (!curPair)
+            throw new FeedError(
+                'UnknownCurrencyPairOrSource',
+                request.choiceId.choice_name
+            );
+        let price = 0n;
+        switch (curPair.source) {
+            case 'Coingecko':
+                price = await getCoingeckoPrice(curPair, request.choiceBounds);
+                break;
+        }
 
-    const input: Input = makeInput(request.choiceId, price);
-    return input;
+        const input: Input = makeInput(request.choiceId, price);
+        return input;
+    } catch (e) {
+        if (e instanceof FeedError) {
+            console.log(e.name, e.message);
+            return Promise.reject(e.name + e.message);
+        } else {
+            return Promise.reject(e);
+        }
+    }
 }
 
 /**
@@ -111,7 +120,7 @@ async function queryCoingecko(from: string, to: string): Promise<number> {
         },
     });
     if (!response.ok) {
-        throw new RequestError(`${response.statusText}`, `${response.status}`);
+        throw new RequestError(`${response.status}`, response.statusText);
     }
     const result = (await response.json()) as CoingeckoResponse;
     if (result[from]) {
