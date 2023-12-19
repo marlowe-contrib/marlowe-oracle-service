@@ -101,7 +101,7 @@ export async function getActiveContracts(
         allResponses = await getAllContracts(client, contractsRequest);
     } catch (e) {
         if (e instanceof RequestError) {
-            if (e.name = '404') {
+            if (e.name == '404') {
                 throw new ScanError('404', e.message);
             } else {
                 console.log(e.name, e.message, e.extra);
