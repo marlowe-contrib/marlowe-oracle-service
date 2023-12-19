@@ -50,6 +50,28 @@ type FeedErrorNames =
     | 'UnknownQuoteCurrencyForCGQuery'
     | 'UnknownError';
 
+/**
+ * Errors from the tx module.
+ */
+export class BuildTransactionError extends BaseError<BuildTransactionErrorNames> {
+    constructor(name: BuildTransactionErrorNames, message?: string) {
+        super(name, message);
+        Object.setPrototypeOf(this, RequestError.prototype);
+    }
+ }
+
+type BuildTransactionErrorNames =
+    | 'NoDatumsFoundInTransaction'
+    | 'NoDatumFoundForDatumHash'
+    | 'NoRedeemerInTransaction.ExpectedOne'
+    | 'MoreThanOneRedeemerInTransaction.ExpectedJustOne'
+    | 'NoTransactionInputFoundOnInputsList'
+    | 'MarloweOutputWithoutDatum'
+    | 'MoreThanOneMarloweContractOutput'
+
+/**
+ * Http requests errors.
+ */
 export class RequestError extends BaseError<string> {
     extra!: unknown;
     constructor(name: string, message: string, extra?: unknown) {
@@ -59,5 +81,5 @@ export class RequestError extends BaseError<string> {
     }
 }
 
-export class BuildTransactionError extends BaseError<string> { }
+
 

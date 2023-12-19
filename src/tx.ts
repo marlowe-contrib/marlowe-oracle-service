@@ -16,7 +16,6 @@ import {
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
 import { BuildTransactionError, RequestError } from './error.ts';
-import { error } from 'fp-ts/lib/Console';
 
 /**
  * Send an unsigned transaction to the signing service.
@@ -76,12 +75,14 @@ export async function buildAndSubmit(
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 const e = error as AxiosError;
-                console.error(
-                    'Axios error occurred: ' + e.response?.statusText.toString()
-                );
-                console.error(e.response?.data);
-            } else {
-                console.error('Unexpected error occurred', error);
+                if (e.response) {
+                    const errorName = e.response?.status;
+                    const errorStatus = e.response?.statusText;
+                    const errorMessage = e.response?.data;
+                    throw new RequestError(`${errorName}`, errorStatus, errorMessage);
+                }
+            } else if (error instanceof BuildTransactionError) {
+                console.log(error.name, error.message);
             }
             return 'Error occurred';
         }
@@ -103,7 +104,7 @@ function findDatumFromHash(
     transaction: C.Transaction
 ): C.PlutusData {
     const allDatums = transaction.witness_set().plutus_data();
-    if (!allDatums) throw new Error('No datums in tx');
+    if (!allDatums) throw new BuildTransactionError('NoDatumsFoundInTransaction');
 
     for (let i = 0; i < allDatums.len(); i++) {
         const datum = allDatums.get(i);
@@ -112,7 +113,7 @@ function findDatumFromHash(
         }
     }
 
-    throw new Error(`No Datum found for datum hash: ${hash}`);
+    throw new BuildTransactionError('NoDatumFoundForDatumHash', hash);
 }
 
 /**
@@ -127,11 +128,10 @@ function getOnlyRedeemerFromTransaction(
 ): C.Redeemer {
     const redeemers = transaction.witness_set().redeemers();
 
-    if (!redeemers) throw new Error('No redeemer in transaction. Expected 1');
+    if (!redeemers) throw new BuildTransactionError('NoRedeemerInTransaction.ExpectedOne');
 
     if (redeemers.len() > 1)
-        throw new Error('More than 1 redeemer in transaction. Expected 1');
-
+        throw new BuildTransactionError('MoreThanOneRedeemerInTransaction.ExpectedJustOne');
     return redeemers.get(0);
 }
 
@@ -224,7 +224,7 @@ function translateToTx(
     }
 
     if (!validInput)
-        throw new Error('No transaction input was found on inputs list');
+        throw new BuildTransactionError('NoTransactionInputFoundOnInputsList');
 
     const redeemerCbor = toHex(redeemer.data().to_bytes());
     finalTx.collectFrom([validInput], redeemerCbor);
@@ -240,14 +240,14 @@ function translateToTx(
     }
 
     if (outputsList.length > 1)
-        throw new Error('More than one Marlowe Contract Output');
+        throw new BuildTransactionError('MoreThanOneMarloweContractOutput');
 
     if (outputsList.length === 1) {
         const out = outputsList[0];
 
         const datumHash = out.datum()?.as_data_hash()?.to_hex();
 
-        if (!datumHash) throw new Error('Marlowe Output without datum');
+        if (!datumHash) throw new BuildTransactionError('MarloweOutputWithoutDatum');
 
         const datum = findDatumFromHash(datumHash, transaction);
         const datumCBOR = toHex(datum.to_bytes());
