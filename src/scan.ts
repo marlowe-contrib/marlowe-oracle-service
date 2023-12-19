@@ -21,7 +21,7 @@ import { isRight, left, match, right } from 'fp-ts/lib/Either.js';
 import { CanChoose } from '@marlowe.io/language-core-v1/dist/esm/next/applicables/canChoose';
 
 import axios, { AxiosError } from 'axios';
-import { RequestError, ScanError } from './error.ts';
+import { RequestError, ScanError, throwAxiosError } from './error.ts';
 
 /**
  * The OracleRequest type contains the necessary information to identify an
@@ -56,16 +56,10 @@ async function getAllContracts(
             allResponses = allResponses.concat(response.headers);
             cursor = response.nextRange;
         } while (isSome(cursor));
-
     } catch (error) {
         if (axios.isAxiosError(error)) {
             const e = error as AxiosError;
-            if (e.response) {
-                const errorName = e.response?.status;
-                const errorStatus = e.response?.statusText;
-                const errorMessage = e.response?.data;
-                throw new RequestError(`${errorName}`, errorStatus, errorMessage);
-            }
+            throwAxiosError(e);
         } else {
             throw new ScanError('UnknownError');
         }
@@ -102,7 +96,7 @@ export async function getActiveContracts(
     } catch (e) {
         if (e instanceof RequestError) {
             if (e.name == '404') {
-                throw new ScanError('404', e.message);
+                throw new RequestError('404', e.message);
             } else {
                 console.log(e.name, e.message, e.extra);
             }

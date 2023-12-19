@@ -1,3 +1,5 @@
+import { AxiosError } from 'axios';
+
 /**
  * Base class for custom Error objects
  */
@@ -18,7 +20,12 @@ export class BaseError<T extends string> extends Error {
 /**
  *  Errors from the config module.
  */
-export class ConfigError extends BaseError<ConfigErrorNames> {}
+export class ConfigError extends BaseError<ConfigErrorNames> {
+    constructor(name: ConfigErrorNames, message?: string) {
+        super(name, message);
+        Object.setPrototypeOf(this, ConfigError.prototype);
+    }
+}
 
 type ConfigErrorNames =
     | 'MissingEnvironmentVariable'
@@ -30,7 +37,12 @@ type ConfigErrorNames =
 /**
  *  Errors from the scan module.
  */
-export class ScanError extends BaseError<string> {}
+export class ScanError extends BaseError<string> {
+    constructor(name: string, message?: string) {
+        super(name, message);
+        Object.setPrototypeOf(this, ScanError.prototype);
+    }
+}
 
 /**
  *  Errors from the feed module.
@@ -38,7 +50,7 @@ export class ScanError extends BaseError<string> {}
 export class FeedError extends BaseError<FeedErrorNames> {
     constructor(name: FeedErrorNames, message?: string) {
         super(name, message);
-        Object.setPrototypeOf(this, RequestError.prototype);
+        Object.setPrototypeOf(this, FeedError.prototype);
     }
 }
 
@@ -58,7 +70,7 @@ export class BuildTransactionError extends BaseError<BuildTransactionErrorNames>
         super(name, message);
         Object.setPrototypeOf(this, RequestError.prototype);
     }
- }
+}
 
 type BuildTransactionErrorNames =
     | 'NoDatumsFoundInTransaction'
@@ -67,7 +79,7 @@ type BuildTransactionErrorNames =
     | 'MoreThanOneRedeemerInTransaction.ExpectedJustOne'
     | 'NoTransactionInputFoundOnInputsList'
     | 'MarloweOutputWithoutDatum'
-    | 'MoreThanOneMarloweContractOutput'
+    | 'MoreThanOneMarloweContractOutput';
 
 /**
  * Http requests errors.
@@ -81,5 +93,11 @@ export class RequestError extends BaseError<string> {
     }
 }
 
-
-
+export function throwAxiosError(e: AxiosError) {
+    if (e.response) {
+        const errorName = e.response?.status;
+        const errorStatus = e.response?.statusText;
+        const errorMessage = e.response?.data;
+        throw new RequestError(`${errorName}`, errorStatus, errorMessage);
+    }
+}

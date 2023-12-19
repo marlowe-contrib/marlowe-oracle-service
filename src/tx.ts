@@ -15,7 +15,11 @@ import {
     valueToAssets,
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
-import { BuildTransactionError, RequestError } from './error.ts';
+import {
+    BuildTransactionError,
+    RequestError,
+    throwAxiosError,
+} from './error.ts';
 
 /**
  * Send an unsigned transaction to the signing service.
@@ -75,12 +79,7 @@ export async function buildAndSubmit(
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 const e = error as AxiosError;
-                if (e.response) {
-                    const errorName = e.response?.status;
-                    const errorStatus = e.response?.statusText;
-                    const errorMessage = e.response?.data;
-                    throw new RequestError(`${errorName}`, errorStatus, errorMessage);
-                }
+                throwAxiosError(e);
             } else if (error instanceof BuildTransactionError) {
                 console.log(error.name, error.message);
             }
@@ -104,7 +103,8 @@ function findDatumFromHash(
     transaction: C.Transaction
 ): C.PlutusData {
     const allDatums = transaction.witness_set().plutus_data();
-    if (!allDatums) throw new BuildTransactionError('NoDatumsFoundInTransaction');
+    if (!allDatums)
+        throw new BuildTransactionError('NoDatumsFoundInTransaction');
 
     for (let i = 0; i < allDatums.len(); i++) {
         const datum = allDatums.get(i);
@@ -128,10 +128,13 @@ function getOnlyRedeemerFromTransaction(
 ): C.Redeemer {
     const redeemers = transaction.witness_set().redeemers();
 
-    if (!redeemers) throw new BuildTransactionError('NoRedeemerInTransaction.ExpectedOne');
+    if (!redeemers)
+        throw new BuildTransactionError('NoRedeemerInTransaction.ExpectedOne');
 
     if (redeemers.len() > 1)
-        throw new BuildTransactionError('MoreThanOneRedeemerInTransaction.ExpectedJustOne');
+        throw new BuildTransactionError(
+            'MoreThanOneRedeemerInTransaction.ExpectedJustOne'
+        );
     return redeemers.get(0);
 }
 
@@ -247,7 +250,8 @@ function translateToTx(
 
         const datumHash = out.datum()?.as_data_hash()?.to_hex();
 
-        if (!datumHash) throw new BuildTransactionError('MarloweOutputWithoutDatum');
+        if (!datumHash)
+            throw new BuildTransactionError('MarloweOutputWithoutDatum');
 
         const datum = findDatumFromHash(datumHash, transaction);
         const datumCBOR = toHex(datum.to_bytes());
