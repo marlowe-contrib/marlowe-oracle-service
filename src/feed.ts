@@ -1,11 +1,6 @@
 import fetch from 'node-fetch';
 import { addressBech32 } from '@marlowe.io/runtime-core';
-import {
-    ChoiceId,
-    Bound,
-    Input,
-    IChoice,
-} from '@marlowe.io/language-core-v1';
+import { ChoiceId, Bound, Input, IChoice } from '@marlowe.io/language-core-v1';
 import { Address } from 'marlowe-language-core-v1-txpipe';
 import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
 import { OracleRequest } from './scan.ts';

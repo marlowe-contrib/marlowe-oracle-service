@@ -181,7 +181,10 @@ function getProviderEnvValue(network: Network): Provider {
             blockfrostApiKey
         );
     } else {
-        throw new ConfigError('MissingProviderEnvironmentVariable','MAESTRO_APITOKEN or BLOCKFROST_APIKEY');
+        throw new ConfigError(
+            'MissingProviderEnvironmentVariable',
+            'MAESTRO_APITOKEN or BLOCKFROST_APIKEY'
+        );
     }
 }
 
