@@ -1,19 +1,10 @@
 import fetch from 'node-fetch';
-import {
-    AddressBech32,
-    addressBech32,
-    ContractId,
-} from '@marlowe.io/runtime-core';
-import {
-    ChoiceId,
-    Bound,
-    Input,
-    InputContent,
-    IChoice,
-} from '@marlowe.io/language-core-v1';
+import { addressBech32 } from '@marlowe.io/runtime-core';
+import { ChoiceId, Bound, Input, IChoice } from '@marlowe.io/language-core-v1';
 import { Address } from 'marlowe-language-core-v1-txpipe';
 import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
 import { OracleRequest } from './scan.ts';
+import { FeedError, RequestError } from './error.ts';
 
 type Currency = 'ADA' | 'USD';
 
@@ -73,20 +64,33 @@ export async function getApplyInputs(
  * that requires it.
  * @returns contractId (of the contract that requested input) and ApplyRequestInputs
  * (complete inputs to be applied to it).
- * @throws UnkownCurrencyPairOrSourceError
+ * @throws FeedError UnkownCurrencyPairOrSource
  */
 async function feed(request: OracleRequest): Promise<Input> {
-    const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
-    if (!curPair) throw new Error('Unknown currency pair and/or source');
-    let price = 0n;
-    switch (curPair.source) {
-        case 'Coingecko':
-            price = await getCoingeckoPrice(curPair, request.choiceBounds);
-            break;
-    }
+    try {
+        const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
+        if (!curPair)
+            throw new FeedError(
+                'UnknownCurrencyPairOrSource',
+                request.choiceId.choice_name
+            );
+        let price = 0n;
+        switch (curPair.source) {
+            case 'Coingecko':
+                price = await getCoingeckoPrice(curPair, request.choiceBounds);
+                break;
+        }
 
-    const input: Input = makeInput(request.choiceId, price);
-    return input;
+        const input: Input = makeInput(request.choiceId, price);
+        return input;
+    } catch (e) {
+        if (e instanceof FeedError) {
+            console.log(e.name, e.message);
+            return Promise.reject(e.name + e.message);
+        } else {
+            return Promise.reject(e);
+        }
+    }
 }
 
 /**
@@ -94,8 +98,8 @@ async function feed(request: OracleRequest): Promise<Input> {
  * @param from base currency
  * @param to quote currency
  * @returns price
- * @throws ResponseError
- * @throws UnexpectedError
+ * @throws RequestError
+ * @throws FeedError Unknown base or quote currency for Coingecko query
  */
 async function queryCoingecko(from: string, to: string): Promise<number> {
     type CoingeckoResponse = {
@@ -103,22 +107,25 @@ async function queryCoingecko(from: string, to: string): Promise<number> {
             [to: string]: number;
         };
     };
-    const cgApi = `https://api.coingecko.com/api/v3/simple/price?ids=${from}&vs_currencies=${to}`;
-    try {
-        const response = await fetch(cgApi, {
-            method: 'GET',
-            headers: {
-                Accept: 'application/json',
-            },
-        });
-        if (!response.ok) {
-            throw new Error(`Error! status: ${response.status}`);
+    const cgApi = `https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd`;
+    const response = await fetch(cgApi, {
+        method: 'GET',
+        headers: {
+            Accept: 'application/json',
+        },
+    });
+    if (!response.ok) {
+        throw new RequestError(`${response.status}`, response.statusText);
+    }
+    const result = (await response.json()) as CoingeckoResponse;
+    if (result[from]) {
+        if (result[from][to]) {
+            return result[from][to];
+        } else {
+            throw new FeedError('UnknownQuoteCurrencyForCGQuery');
         }
-        const result = (await response.json()) as CoingeckoResponse;
-        return result[from][to];
-    } catch (error) {
-        console.log('unexpected error: ', error);
-        throw new Error('An unexpected error occurred');
+    } else {
+        throw new FeedError('UnknownBaseCurrencyForCGQuery');
     }
 }
 
@@ -142,8 +149,8 @@ function currencyToCoingecko(c: Currency): string {
  * @param curPair Currency pair for the the desired exchange price
  * @param bounds Numeric limits that the price has to be confied within
  * @returns price as a scaled BigInt
- * @throws ResultIsOutOfBounds
- * @throws UnknownCurrencyPair
+ * @throws FeedError ResultIsOutOfBounds
+ * @throws FeedError UnknownCurrencyPair
  */
 async function getCoingeckoPrice(
     curPair: CurrencyPair,
@@ -164,14 +171,17 @@ async function getCoingeckoPrice(
             break;
         }
         default: {
-            throw new Error('Unknown currency pair');
+            throw new FeedError(
+                'UnknownCurrencyPair',
+                curPair.from + curPair.to
+            );
             break;
         }
     }
     if (withinBounds(scaledResult, bounds)) {
         return scaledResult;
     } else {
-        throw new Error('Feed result is out of bounds');
+        throw new FeedError('FeedResultIsOutOfBounds');
     }
 }
 

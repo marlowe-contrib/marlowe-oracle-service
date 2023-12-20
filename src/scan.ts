@@ -20,6 +20,9 @@ import { pipe } from 'fp-ts/lib/function.js';
 import { isRight, left, match, right } from 'fp-ts/lib/Either.js';
 import { CanChoose } from '@marlowe.io/language-core-v1/dist/esm/next/applicables/canChoose';
 
+import axios, { AxiosError } from 'axios';
+import { RequestError, ScanError, throwAxiosError } from './error.ts';
+
 /**
  * The OracleRequest type contains the necessary information to identify an
  * IChoice action that needs to be resolved.
@@ -46,12 +49,21 @@ async function getAllContracts(
     let allResponses: ContractHeader[] = [];
     let cursor: Option<ContractsRange> = none;
 
-    do {
-        request.range = pipe(cursor, toUndefined);
-        const response = await client.getContracts(request);
-        allResponses = allResponses.concat(response.headers);
-        cursor = response.nextRange;
-    } while (isSome(cursor));
+    try {
+        do {
+            request.range = pipe(cursor, toUndefined);
+            const response = await client.getContracts(request);
+            allResponses = allResponses.concat(response.headers);
+            cursor = response.nextRange;
+        } while (isSome(cursor));
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            const e = error as AxiosError;
+            throwAxiosError(e);
+        } else {
+            throw new ScanError('UnknownError');
+        }
+    }
 
     return allResponses;
 }
@@ -78,7 +90,20 @@ export async function getActiveContracts(
         partyAddresses: [b32OracleAddr],
     };
 
-    const allResponses = await getAllContracts(client, contractsRequest);
+    let allResponses: ContractHeader[] = [];
+    try {
+        allResponses = await getAllContracts(client, contractsRequest);
+    } catch (e) {
+        if (e instanceof RequestError) {
+            if (e.name == '404') {
+                throw new RequestError('404', e.message);
+            } else {
+                console.log(e.name, e.message, e.extra);
+            }
+        } else {
+            throw new ScanError('UnknownError');
+        }
+    }
 
     const currentTime: Date = new Date();
     const timeAfter5Minutes: Date = new Date(
