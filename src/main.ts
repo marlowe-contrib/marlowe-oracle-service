@@ -1,8 +1,8 @@
-import { Lucid, MaestroConfig } from 'lucid-cardano';
+import { Lucid, MaestroConfig, UTxO } from 'lucid-cardano';
 import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
 import { Address } from 'marlowe-language-core-v1-txpipe';
 
-import { parseMOSConfig, parseMOSEnv } from './config.ts';
+import { parseMOSConfig, parseMOSEnv, setOracleConfig } from './config.ts';
 import { getActiveContracts } from './scan.ts';
 import { getApplyInputs } from './feed.ts';
 import { buildAndSubmit } from './tx.ts';
@@ -21,6 +21,8 @@ export async function main() {
             address:
                 'addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9',
         };
+
+        const oracleConfig = await setOracleConfig(lucid, mosConfig);
 
         do {
             const activeContracts = await getActiveContracts(

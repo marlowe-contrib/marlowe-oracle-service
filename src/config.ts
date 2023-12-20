@@ -10,11 +10,26 @@ import {
     Maestro,
     Blockfrost,
     MaestroSupportedNetworks,
+    Unit,
+    Lucid,
+    UTxO,
 } from 'lucid-cardano';
 
 import { ConfigError } from './error.ts';
 
 type ResolveMethod = 'All' | 'Address' | 'Role';
+
+type UTxORef = {
+    txHash: string;
+    outputIndex: number;
+};
+
+type Charli3Config<T> = {
+    bridgeUtxo: T;
+    bridgeAddress: string;
+    charli3Address: string;
+    charli3FeedAssetClass: Unit;
+};
 
 /**
  * Configuration structure for the Marlowe Oracle Service.
@@ -24,6 +39,7 @@ type MOSConfig = {
     delay: number;
     resolveMethod: ResolveMethod;
     choiceNames: ChoiceName[];
+    charli3Config: Charli3Config<UTxORef>;
 };
 
 /**
@@ -205,4 +221,21 @@ async function fromFileMOSConfig(filePath: string): Promise<MOSConfig> {
         console.error('Error fetching or parsing JSON:', error);
         throw new ConfigError('ErrorFetchingOrParsingJSON');
     }
+}
+
+export async function setOracleConfig(
+    lucid: Lucid,
+    mosConfig: MOSConfig
+): Promise<Charli3Config<UTxO>> {
+    // FUNCION que verifica q el address del BrdigeVal es igual la address que se calcula del ref script
+    // oracle config para varios oracle
+    const bridgeUtxo: UTxO = (
+        await lucid.utxosByOutRef([
+            {
+                txHash: mosConfig.charli3Config.bridgeUtxo.txHash,
+                outputIndex: mosConfig.charli3Config.bridgeUtxo.outputIndex,
+            },
+        ])
+    )[0];
+    return { ...mosConfig.charli3Config, bridgeUtxo: bridgeUtxo };
 }

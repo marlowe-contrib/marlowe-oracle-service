@@ -3,5 +3,14 @@
   "resolveMethod": "Address",
   "choiceNames": [
     "Coingecko ADAUSD"
-  ]
+  ],
+  "charli3Config" : {
+    "bridgeUtxoRef": {
+      "txHash": "c7ceed9173de0aa230c28fd2bccc97ce115e9c4ae049510429545a39c95c5436",
+      "outputIndex": 0
+    },
+    "bridgeAddress": "addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9",
+    "charli3Address": "addr_test1wzn5ee2qaqvly3hx7e0nk3vhm240n5muq3plhjcnvx9ppjgf62u6a",
+    "charli3FeedAssetClass": "1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf074f7261636c6546656564"
+  }
 }
