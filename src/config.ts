@@ -24,7 +24,7 @@ type UTxORef = {
     outputIndex: number;
 };
 
-type Charli3Config<T> = {
+type OracleConfig<T> = {
     bridgeUtxo: T;
     bridgeAddress: string;
     charli3Address: string;
@@ -39,7 +39,7 @@ type MOSConfig = {
     delay: number;
     resolveMethod: ResolveMethod;
     choiceNames: ChoiceName[];
-    charli3Config: Charli3Config<UTxORef>;
+    oracleConfig: OracleConfig<UTxORef>;
 };
 
 /**
@@ -225,17 +225,25 @@ async function fromFileMOSConfig(filePath: string): Promise<MOSConfig> {
 
 export async function setOracleConfig(
     lucid: Lucid,
-    mosConfig: MOSConfig
-): Promise<Charli3Config<UTxO>> {
-    // FUNCION que verifica q el address del BrdigeVal es igual la address que se calcula del ref script
-    // oracle config para varios oracle
+    mc: MOSConfig
+): Promise<OracleConfig<UTxO>> {
     const bridgeUtxo: UTxO = (
         await lucid.utxosByOutRef([
             {
-                txHash: mosConfig.charli3Config.bridgeUtxo.txHash,
-                outputIndex: mosConfig.charli3Config.bridgeUtxo.outputIndex,
+                txHash: mc.oracleConfig.bridgeUtxo.txHash,
+                outputIndex: mc.oracleConfig.bridgeUtxo.outputIndex,
             },
         ])
     )[0];
-    return { ...mosConfig.charli3Config, bridgeUtxo: bridgeUtxo };
+
+    if (!bridgeUtxo) throw new ConfigError('UTxONotFound');
+
+    if (!bridgeUtxo.scriptRef) throw new ConfigError('ScriptRefNotFoundInUTx0');
+
+    const bridgeAddress = lucid.utils.validatorToAddress(bridgeUtxo.scriptRef);
+
+    if (bridgeAddress != mc.oracleConfig.bridgeAddress)
+        throw new ConfigError('CalculatedBridgeAddressDoesNotMatchConfigOne');
+
+    return { ...mc.oracleConfig, bridgeUtxo: bridgeUtxo };
 }
