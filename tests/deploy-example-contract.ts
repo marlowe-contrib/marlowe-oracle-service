@@ -1,17 +1,22 @@
 import { parseMOSEnv } from '../src/config.ts';
-import { signTx } from '../src/tx.ts';
 
 import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
 import { AddressBech32, addressBech32 } from '@marlowe.io/runtime-core';
 import { Contract } from '@marlowe.io/language-core-v1';
 import { CreateContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/index';
+import { Address, C, Lucid } from 'lucid-cardano';
+import { processMarloweOutput } from '../src/tx.ts';
 
 const mosEnv = parseMOSEnv();
 const client = mkRestClient(mosEnv.marloweRuntimeUrl);
+const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
+lucid.selectWalletFromPrivateKey('COMPLETE ME');
 
 const choice_name = 'Coingecko ADAUSD';
-const choice_owner = 'COMPLETE ';
+const choice_owner = 'COMPLETE ME';
 const changeAddress: AddressBech32 = addressBech32('COMPLETE ME');
+const marloweAddress: Address =
+    'addr_test1wrv9l2du900ajl27hk79u07xda68vgfugrppkua5zftlp8g0l9djk';
 
 function getTimeout(): bigint {
     const date = new Date();
@@ -65,20 +70,26 @@ if (!contract) throw new Error('Failed creating contract');
 console.log('contractId: ', contract.contractId);
 console.log('contractTx: ', contract.tx);
 
-const signed = {
-    cborHex: await signTx(mosEnv.signTxUrl, contract.tx.cborHex),
-    description: contract.tx.description,
-    type: contract.tx.type,
-};
+const txCbor = contract.tx.cborHex;
+const transaction = C.Transaction.from_bytes(Buffer.from(txCbor, 'hex'));
 
-console.log('Signed contractTx: ', signed);
+try {
+    const tx = processMarloweOutput(transaction, lucid, marloweAddress);
+    const balancedTx = await tx.complete();
+    const signedTx = balancedTx.sign();
+    const finalTx = await signedTx.complete();
 
-{
-    try {
-        await client.submitContract(contract.contractId, signed);
-        console.log('Submitted');
-    } catch (error) {
-        console.log(error);
-        throw new Error('Submition failed');
-    }
+    const signed = {
+        cborHex: finalTx.toString(),
+        description: contract.tx.description,
+        type: contract.tx.type,
+    };
+
+    console.log('Signed contractTx: ', signed);
+
+    await client.submitContract(contract.contractId, signed);
+    console.log('Submitted');
+} catch (error) {
+    console.log(error);
+    throw new Error('Submition failed');
 }

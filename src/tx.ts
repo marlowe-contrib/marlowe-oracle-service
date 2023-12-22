@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
 import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
 import {
@@ -16,43 +15,12 @@ import {
     valueToAssets,
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
-import {
-    BuildTransactionError,
-    RequestError,
-    throwAxiosError,
-} from './error.ts';
-
-/**
- * Send an unsigned transaction to the signing service.
- *
- * @param signURL Url of the signing service
- * @param cborHex Unsigned transaction in CBOR format
- * @returns Signed transaction
- */
-export async function signTx(signURL: string, cborHex: string) {
-    const response = await fetch(signURL, {
-        method: 'POST',
-        body: JSON.stringify(cborHex),
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        throw new RequestError(`${response.status}`, response.statusText);
-    }
-
-    const result = (await response.json()) as string;
-
-    return result;
-}
+import { BuildTransactionError, throwAxiosError } from './error.ts';
 
 /**
  * Build the transactions that apply inputs to each contract, sign them
  * and submit them.
  *
- * @param signTxUrl Url of the transaction signing service
  * @param client Marlowe Rest client
  * @param lucid Instance of Lucid initiated with a provider
  * @param applicableInputs Array of requests to apply inputs to the respective contracts
@@ -260,7 +228,47 @@ function translateToTx(
     const redeemerCbor = toHex(redeemer.data().to_bytes());
     finalTx.collectFrom([validInput], redeemerCbor);
 
+    finalTx.compose(processMarloweOutput(transaction, lucid, marloweAddress));
+
+    const slotFrom = transaction.body().validity_start_interval();
+    const slotUntil = transaction.body().ttl();
+
+    const from: number = utils.slotToUnixTime(Number(slotFrom!.to_str()));
+    const until: number = utils.slotToUnixTime(Number(slotUntil!.to_str()));
+
+    finalTx.validFrom(from);
+    finalTx.validTo(until);
+
+    const requiredSigners = transaction.body().required_signers();
+
+    if (requiredSigners) {
+        for (let i = 0; i < requiredSigners?.len(); i++) {
+            const reqSigner = requiredSigners?.get(i);
+            const key = reqSigner.to_hex();
+            finalTx.addSignerKey(key);
+        }
+    }
+
+    return finalTx;
+}
+
+/**
+ * Given a CML Transaction, create a Lucid Tx that only has the marlowe output.
+ * Fails if there's more than one output at the marlowe address or if the output
+ * doesn't have a datum.
+ * @param transaction CML transaction to process
+ * @param lucid lucid instance
+ * @param marloweAddress Address of the marlowe validator
+ * @returns The Lucid Tx with either one or none outputs
+ * @throws BuildTransactionError
+ */
+export function processMarloweOutput(
+    transaction: C.Transaction,
+    lucid: Lucid,
+    marloweAddress: Address
+): Tx {
     const outputs = transaction.body().outputs();
+    let finalTx: Tx = new Tx(lucid);
     let outputsList: C.TransactionOutput[] = [];
 
     for (let i = 0; i < outputs.len(); i++) {
@@ -287,25 +295,6 @@ function translateToTx(
 
         const outputData: OutputData = { asHash: datumCBOR };
         finalTx.payToContract(marloweAddress, outputData, assets);
-    }
-
-    const slotFrom = transaction.body().validity_start_interval();
-    const slotUntil = transaction.body().ttl();
-
-    const from: number = utils.slotToUnixTime(Number(slotFrom!.to_str()));
-    const until: number = utils.slotToUnixTime(Number(slotUntil!.to_str()));
-
-    finalTx.validFrom(from);
-    finalTx.validTo(until);
-
-    const requiredSigners = transaction.body().required_signers();
-
-    if (requiredSigners) {
-        for (let i = 0; i < requiredSigners?.len(); i++) {
-            const reqSigner = requiredSigners?.get(i);
-            const key = reqSigner.to_hex();
-            finalTx.addSignerKey(key);
-        }
     }
 
     return finalTx;
