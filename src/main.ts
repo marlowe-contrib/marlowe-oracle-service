@@ -10,29 +10,27 @@ import { ConfigError, RequestError } from './error.ts';
 
 export async function main() {
     try {
-        const mosConfig = await parseMOSConfig();
+        const mc = await parseMOSConfig();
         const mosEnv = parseMOSEnv();
 
         const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
         lucid.selectWalletFromPrivateKey('COMPLETE ME');
         const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 
-        const mosAddress: Address = {
-            address:
-                'addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9',
-        };
+        const mosConfig = await setOracleConfig(lucid, mc);
 
-        const oracleConfig = await setOracleConfig(lucid, mosConfig);
+        if (!mosConfig.resolveMethod.address)
+            throw new Error('NoAddressConfig');
 
         do {
             const activeContracts = await getActiveContracts(
                 client,
-                mosAddress,
-                mosConfig.choiceNames
+                mosConfig.resolveMethod.address.mosAddress,
+                mosConfig.resolveMethod.address.choiceNames
             );
 
             const applicableInputs = await getApplyInputs(
-                mosAddress,
+                mosConfig.resolveMethod.address.mosAddress,
                 activeContracts
             );
             console.log(applicableInputs);
