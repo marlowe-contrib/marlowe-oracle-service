@@ -17,7 +17,7 @@ export async function main() {
         lucid.selectWalletFromPrivateKey('COMPLETE ME');
         const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 
-        const mosConfig = await setOracleConfig(lucid, mc);
+        const mosConfig = await setOracleConfig(mc, lucid);
 
         if (!mosConfig.resolveMethod.address)
             throw new Error('NoAddressConfig');

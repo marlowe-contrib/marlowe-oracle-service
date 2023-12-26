@@ -13,15 +13,21 @@ import {
     Unit,
     Lucid,
     UTxO,
+    OutRef,
 } from 'lucid-cardano';
 
 import { ConfigError } from './error.ts';
 
-type UTxORef = {
-    txHash: string;
-    outputIndex: number;
-};
-
+/**
+ * Configuration for decentralized oracles method.
+ * Includes:
+ * - ChoiceNames it resolves,
+ * - RoleNames it answers to,
+ * - the UTxO Ref of the  Bridge validator
+ * - the address of the Bridge validator
+ * - the address of the decentralized oracle's feed
+ * - the asset class of the token that identifies the dec oracle feed UTx0.
+ */
 type OracleConfig<T> = {
     choiceNames: ChoiceName;
     roleNames: string;
@@ -31,11 +37,18 @@ type OracleConfig<T> = {
     feedAssetClass: Unit;
 };
 
+/**
+ * Configuration for the address method.
+ * Includes the address of the MOS and the Choice Names it resolves.
+ */
 type AddressConfig = {
     mosAddress: Address;
     choiceNames: ChoiceName[];
 };
 
+/**
+ * Structure for configuration of the different resolve methods.
+ */
 type ResolveMethod<T> = {
     address: AddressConfig | undefined;
     charli3: OracleConfig<T> | undefined;
@@ -43,7 +56,7 @@ type ResolveMethod<T> = {
 
 /**
  * Configuration structure for the Marlowe Oracle Service.
- * Specifies delay (milliseconds), resolution method, and choice names.
+ * Specifies delay (milliseconds) and resolution methods.
  */
 type MOSConfig<T> = {
     delay: number;
@@ -114,7 +127,7 @@ export function parseMOSEnv(): MOSEnv {
  * @returns A promise resolving to the parsed MOS configuration.
  * @throws Error Throws an error if there's an issue reading or parsing the file.
  */
-export async function parseMOSConfig(): Promise<MOSConfig<UTxORef>> {
+export async function parseMOSConfig(): Promise<MOSConfig<OutRef>> {
     let args = '';
     const program = new Command();
     console.log(figlet.textSync('Marlowe Oracle Service'));
@@ -220,11 +233,11 @@ function getProviderEnvValue(network: Network): Provider {
  */
 async function fromFileMOSConfig(
     filePath: string
-): Promise<MOSConfig<UTxORef>> {
+): Promise<MOSConfig<OutRef>> {
     try {
         const fileContent = readFileSync(filePath, 'utf-8');
         const json = JSON.parse(fileContent);
-        const parsedData = json as MOSConfig<UTxORef>;
+        const parsedData = json as MOSConfig<OutRef>;
 
         return parsedData;
     } catch (error) {
@@ -234,8 +247,8 @@ async function fromFileMOSConfig(
 }
 
 export async function setOracleConfig(
-    lucid: Lucid,
-    mc: MOSConfig<UTxORef>
+    mc: MOSConfig<OutRef>,
+    lucid: Lucid
 ): Promise<MOSConfig<UTxO>> {
     if (!(mc.resolveMethod.address || mc.resolveMethod.charli3))
         throw new Error('NoResolveMethodDefined');
@@ -243,13 +256,7 @@ export async function setOracleConfig(
     if (!mc.resolveMethod.charli3) return Promise.reject('NoCharli3Config');
 
     const bridgeUtxo: UTxO = (
-        await lucid.utxosByOutRef([
-            {
-                txHash: mc.resolveMethod.charli3.bridgeUtxo.txHash,
-                outputIndex: mc.resolveMethod.charli3.bridgeUtxo.outputIndex,
-            },
-        ])
-    )[0];
+        await lucid.utxosByOutRef([mc.resolveMethod.charli3.bridgeUtxo]))[0];
 
     if (!bridgeUtxo) throw new ConfigError('UTxONotFound');
 
@@ -258,7 +265,7 @@ export async function setOracleConfig(
     const bridgeAddress = lucid.utils.validatorToAddress(bridgeUtxo.scriptRef);
 
     if (bridgeAddress != mc.resolveMethod.charli3.bridgeAddress)
-        throw new ConfigError('CalculatedBridgeAddressDoesNotMatchConfigOne');
+        throw new ConfigError('CalculatedValidatorAddressDoesNotMatchGivenOne');
 
     return {
         ...mc,
