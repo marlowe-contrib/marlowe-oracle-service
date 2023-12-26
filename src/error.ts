@@ -34,7 +34,7 @@ type ConfigErrorNames =
     | 'UnknownNetwork'
     | 'ErrorFetchingOrParsingJSON'
     | 'UTxONotFound'
-    | 'ScriptRefNotFoundInUTx0'
+    | 'ScriptRefNotFoundInUTxO'
     | 'CalculatedValidatorAddressDoesNotMatchGivenOne'
     | 'NoResolveMethodDefined';
 

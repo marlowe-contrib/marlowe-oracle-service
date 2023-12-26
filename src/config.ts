@@ -14,6 +14,7 @@ import {
     Lucid,
     UTxO,
     OutRef,
+    PrivateKey
 } from 'lucid-cardano';
 
 import { ConfigError } from './error.ts';
@@ -68,10 +69,13 @@ type MOSConfig<T> = {
  * Includes Marlowe Runtime URL, network information, and
  * provider details for the service.
  */
-type MOSEnv = {
+type MOSEnv<T> = {
     marloweRuntimeUrl: string;
     network: Network;
     provider: Provider;
+    signingKey: PrivateKey;
+    marloweValidatorAddress: string;
+    marloweValidatorUtxo: T;
 };
 
 /**
@@ -79,17 +83,31 @@ type MOSEnv = {
  * - MARLOWE_RUNTIME_URL
  * - NETWORK
  * - MAESTRO_API_TOKEN xor BLOCKFROST_API_KEY
+ * - SIGNING_KEY
+ * - MARLOWE_VALIDATOR_ADDRESS
+ * - MARLOWE_VALIDATOR_TX_HASH
+ * - MARLOWE_VALIDATOR_OUTPUT_INDEX
  * @returns Marlowe Oracle Service environment configuration
  */
-function getMOSEnv(): MOSEnv {
+function getMOSEnv(): MOSEnv<OutRef> {
     const mrUrl = getEnvValue('MARLOWE_RUNTIME_URL');
     const network = getEnvValue('NETWORK');
     const provider = getProviderEnvValue(network as Network);
+    const signingKey = getEnvValue('SIGNING_KEY');
+    const mvAddress = getEnvValue('MARLOWE_VALIDATOR_ADDRESS');
+    const mvUtxoRefHash = getEnvValue('MARLOWE_VALIDATOR_TX_HASH');
+    const mvUtxoRefIndex = getEnvValue('MARLOWE_VALIDATOR_OUTPUT_INDEX');
 
     return {
         marloweRuntimeUrl: mrUrl,
         network: network as Network,
         provider: provider,
+        signingKey: signingKey,
+        marloweValidatorAddress: mvAddress,
+        marloweValidatorUtxo: {
+            txHash: mvUtxoRefHash,
+            outputIndex: +mvUtxoRefIndex,
+        },
     };
 }
 
@@ -100,10 +118,14 @@ function getMOSEnv(): MOSEnv {
  * - MARLOWE_RUNTIME_URL
  * - NETWORK
  * - MAESTRO_API_TOKEN xor BLOCKFROST_API_KEY
+ * - SIGNING_KEY
+ * - MARLOWE_VALIDATOR_ADDRESS
+ * - MARLOWE_VALIDATOR_TX_HASH
+ * - MARLOWE_VALIDATOR_OUTPUT_INDEX
  * @returns Marlowe Oracle Service validated environment configuration
  * @throws Error
  */
-export function parseMOSEnv(): MOSEnv {
+export function parseMOSEnv(): MOSEnv<OutRef> {
     const mosEnv = getMOSEnv();
     const providers = ['MAESTRO_API_TOKEN', 'BLOCKFROST_API_KEY'];
 
@@ -232,7 +254,10 @@ async function fromFileMOSConfig(filePath: string): Promise<MOSConfig<OutRef>> {
         const json = JSON.parse(fileContent);
         const parsedData = json as MOSConfig<OutRef>;
 
-        if (!parsedData.resolveMethod.address && !parsedData.resolveMethod.charli3)
+        if (
+            !parsedData.resolveMethod.address &&
+            !parsedData.resolveMethod.charli3
+        )
             throw new ConfigError('NoResolveMethodDefined');
 
         return parsedData;
@@ -242,28 +267,35 @@ async function fromFileMOSConfig(filePath: string): Promise<MOSConfig<OutRef>> {
     }
 }
 
+async function getUTxOWithScriptRef(
+    lucid: Lucid,
+    utxoRef: OutRef,
+    address: string
+): Promise<UTxO> {
+    const utxo: UTxO = (await lucid.utxosByOutRef([utxoRef]))[0];
+
+    if (!utxo) throw new ConfigError('UTxONotFound');
+
+    if (!utxo.scriptRef) throw new ConfigError('ScriptRefNotFoundInUTxO');
+
+    const calculatedAddress = lucid.utils.validatorToAddress(utxo.scriptRef);
+
+    if (calculatedAddress != address)
+        throw new ConfigError('CalculatedValidatorAddressDoesNotMatchGivenOne');
+
+    return utxo;
+}
+
 export async function setOracleConfig(
     mc: MOSConfig<OutRef>,
     lucid: Lucid
 ): Promise<MOSConfig<UTxO>> {
     if (mc.resolveMethod.charli3) {
-        const bridgeUtxo: UTxO = (
-            await lucid.utxosByOutRef([mc.resolveMethod.charli3.bridgeUtxo])
-        )[0];
-
-        if (!bridgeUtxo) throw new ConfigError('UTxONotFound');
-
-        if (!bridgeUtxo.scriptRef)
-            throw new ConfigError('ScriptRefNotFoundInUTx0');
-
-        const bridgeAddress = lucid.utils.validatorToAddress(
-            bridgeUtxo.scriptRef
+        const bridgeUtxo: UTxO = await getUTxOWithScriptRef(
+            lucid,
+            mc.resolveMethod.charli3.bridgeUtxo,
+            mc.resolveMethod.charli3.bridgeAddress
         );
-
-        if (bridgeAddress != mc.resolveMethod.charli3.bridgeAddress)
-            throw new ConfigError(
-                'CalculatedValidatorAddressDoesNotMatchGivenOne'
-            );
 
         return {
             ...mc,
@@ -278,4 +310,20 @@ export async function setOracleConfig(
     } else {
         return mc as MOSConfig<UTxO>;
     }
+}
+
+export async function setMarloweUTxO(
+    mosenv: MOSEnv<OutRef>,
+    lucid: Lucid
+): Promise<MOSEnv<UTxO>> {
+    const validatorUtxo = await getUTxOWithScriptRef(
+        lucid,
+        mosenv.marloweValidatorUtxo,
+        mosenv.marloweValidatorAddress
+    );
+
+    return {
+        ...mosenv,
+        marloweValidatorUtxo: validatorUtxo,
+    };
 }
