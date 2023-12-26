@@ -4,6 +4,7 @@ import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe
 import {
     Address,
     C,
+    ExternalWallet,
     Lucid,
     OutRef,
     OutputData,
@@ -61,21 +62,51 @@ export async function buildAndSubmit(
     client: RestClient,
     lucid: Lucid,
     applicableInputs: ApplyInputsToContractRequest[]
-): Promise<string> {
+): Promise<string[]> {
     if (applicableInputs.length > 0) {
         try {
-            const appliedInput = await client.applyInputsToContract(
-                applicableInputs[0]
-            );
+            const transactions = applicableInputs.map(async (input) => {
+                return client
+                    .applyInputsToContract(input)
+                    .then((appliedInput) => {
+                        return processCbor(appliedInput.tx.cborHex, lucid);
+                    });
+            });
 
-            const balancedTx = await processAndBalanceCbor(
-                appliedInput.tx.cborHex,
-                lucid
-            );
-            const signedTx = balancedTx.sign();
-            const txHash = (await signedTx.complete()).submit();
+            const psTransactions = await Promise.allSettled(transactions);
 
-            return txHash;
+            const fulfilled: Tx[] = [];
+
+            psTransactions.forEach((res, idx) => {
+                if (res.status === 'fulfilled') {
+                    fulfilled.push(res.value);
+                } else {
+                    console.log(res);
+                }
+            });
+
+            const completedTxs = await balanceParallel(fulfilled, lucid);
+
+            const signedTxs = completedTxs.map((tx) => {
+                return tx.sign();
+            });
+            const txHashes = signedTxs.map(async (signedTx) => {
+                return (await signedTx.complete()).submit();
+            });
+
+            const psSubmitted = await Promise.allSettled(txHashes);
+
+            const submitted: string[] = [];
+
+            psSubmitted.forEach((res, idx) => {
+                if (res.status === 'fulfilled') {
+                    submitted.push(res.value);
+                } else {
+                    console.log(res);
+                }
+            });
+
+            return submitted;
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 const e = error as AxiosError;
@@ -83,10 +114,10 @@ export async function buildAndSubmit(
             } else if (error instanceof BuildTransactionError) {
                 console.log(error.name, error.message);
             }
-            return 'Error occurred';
+            return ['Error occurred'];
         }
     } else {
-        return 'No inputs to apply';
+        return ['No inputs to apply'];
     }
 }
 
@@ -170,10 +201,7 @@ function getRefFromInput(input: C.TransactionInput): OutRef {
     return ref;
 }
 
-async function processAndBalanceCbor(
-    cbor: string,
-    lucid: Lucid
-): Promise<TxComplete> {
+async function processCbor(cbor: string, lucid: Lucid): Promise<Tx> {
     const transaction = C.Transaction.from_bytes(Buffer.from(cbor, 'hex'));
 
     const refScriptRef = {
@@ -187,7 +215,7 @@ async function processAndBalanceCbor(
     const newTx = translateToTx(transaction, allMarloweInputs, lucid);
     newTx.readFrom(resScriptUtxo);
 
-    return newTx.complete();
+    return newTx;
 }
 
 /**
@@ -281,4 +309,63 @@ function translateToTx(
     }
 
     return finalTx;
+}
+
+/**
+ * Balances a list of txs, making sure than the utxos used for balancing don't
+ * overlap
+ * @param txs transactions to balance
+ * @param lucid lucid instance
+ * @returns The balanced transactions
+ */
+async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
+    const wallet = lucid.wallet;
+    let completedTxs: TxComplete[] = [];
+
+    try {
+        const address = await wallet.address();
+        let utxos = await wallet.getUtxos();
+
+        for (var tx of txs) {
+            const external: ExternalWallet = { address: address, utxos: utxos };
+            lucid.selectWalletFrom(external);
+
+            const completedTx = await tx.complete({ nativeUplc: false });
+            completedTxs.push(completedTx);
+
+            const usedUtxos = completedTx.txComplete.body().inputs();
+            utxos = utxos.filter((utxo) => {
+                const ref: OutRef = {
+                    txHash: utxo.txHash,
+                    outputIndex: utxo.outputIndex,
+                };
+                return !isIncluded(ref, usedUtxos);
+            });
+        }
+    } catch (err) {
+        console.log(err);
+    } finally {
+        lucid.wallet = wallet;
+        return completedTxs;
+    }
+}
+
+/**
+ * Checks if a given OutRef is included in the transaction inputs of a CML Tx
+ * @param ref the OutRef to look for
+ * @param inputs the inputs list to check
+ * @returns Wether it is included
+ */
+function isIncluded(ref: OutRef, inputs: C.TransactionInputs): Boolean {
+    for (var i = 0; i < inputs.len(); i++) {
+        const input = inputs.get(i);
+        const setRef = getRefFromInput(input);
+        if (
+            setRef.txHash === ref.txHash &&
+            setRef.outputIndex == ref.outputIndex
+        ) {
+            return true;
+        }
+    }
+    return false;
 }
