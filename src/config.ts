@@ -65,12 +65,11 @@ type MOSConfig<T> = {
 
 /**
  * Environment configuration required for the Marlowe Oracle Service.
- * Includes Marlowe Runtime and Signing Service URL, network information, and
+ * Includes Marlowe Runtime URL, network information, and
  * provider details for the service.
  */
 type MOSEnv = {
     marloweRuntimeUrl: string;
-    signTxUrl: string;
     network: Network;
     provider: Provider;
 };
@@ -78,20 +77,17 @@ type MOSEnv = {
 /**
  * Retrieves and constructs the Marlowe Oracle Service environment configuration:
  * - MARLOWE_RUNTIME_URL
- * - SIGN_TX_URL
  * - NETWORK
  * - MAESTRO_API_TOKEN xor BLOCKFROST_API_KEY
  * @returns Marlowe Oracle Service environment configuration
  */
 function getMOSEnv(): MOSEnv {
     const mrUrl = getEnvValue('MARLOWE_RUNTIME_URL');
-    const signUrl = getEnvValue('SIGN_TX_URL');
     const network = getEnvValue('NETWORK');
     const provider = getProviderEnvValue(network as Network);
 
     return {
         marloweRuntimeUrl: mrUrl,
-        signTxUrl: signUrl,
         network: network as Network,
         provider: provider,
     };
@@ -102,7 +98,6 @@ function getMOSEnv(): MOSEnv {
  * required environment variables.
  * Throws an error if any required environment variable is missing.
  * - MARLOWE_RUNTIME_URL
- * - SIGN_TX_URL
  * - NETWORK
  * - MAESTRO_API_TOKEN xor BLOCKFROST_API_KEY
  * @returns Marlowe Oracle Service validated environment configuration
