@@ -18,7 +18,6 @@ import axios, { AxiosError } from 'axios';
 import { BuildTransactionError, throwAxiosError } from './error.ts';
 import { MOSEnv } from './config.ts';
 
-
 /**
  * Build the transactions that apply inputs to each contract, sign them
  * and submit them.
@@ -231,7 +230,9 @@ function translateToTx(
     const redeemerCbor = toHex(redeemer.data().to_bytes());
     finalTx.collectFrom([validInput], redeemerCbor);
 
-    finalTx.compose(processMarloweOutput(transaction, lucid, mosEnv.marloweValidatorAddress));
+    finalTx.compose(
+        processMarloweOutput(transaction, lucid, mosEnv.marloweValidatorAddress)
+    );
 
     const slotFrom = transaction.body().validity_start_interval();
     const slotUntil = transaction.body().ttl();
@@ -276,10 +277,7 @@ export function processMarloweOutput(
 
     for (let i = 0; i < outputs.len(); i++) {
         const out = outputs.get(i);
-        if (
-            out.address().to_bech32(undefined) ===
-            marloweAddress
-        ) {
+        if (out.address().to_bech32(undefined) === marloweAddress) {
             outputsList.push(out);
         }
     }
@@ -300,11 +298,7 @@ export function processMarloweOutput(
         const assets = valueToAssets(out.amount());
 
         const outputData: OutputData = { asHash: datumCBOR };
-        finalTx.payToContract(
-            marloweAddress,
-            outputData,
-            assets
-        );
+        finalTx.payToContract(marloweAddress, outputData, assets);
     }
 
     return finalTx;
