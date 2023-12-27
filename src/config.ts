@@ -14,7 +14,7 @@ import {
     Lucid,
     UTxO,
     OutRef,
-    PrivateKey
+    PrivateKey,
 } from 'lucid-cardano';
 
 import { ConfigError } from './error.ts';
