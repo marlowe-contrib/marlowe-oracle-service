@@ -32,7 +32,11 @@ type ConfigErrorNames =
     | 'MissingProviderEnvironmentVariable'
     | 'MoreThanOneProviderVariable'
     | 'UnknownNetwork'
-    | 'ErrorFetchingOrParsingJSON';
+    | 'ErrorFetchingOrParsingJSON'
+    | 'UTxONotFound'
+    | 'ScriptRefNotFoundInUTx0'
+    | 'CalculatedValidatorAddressDoesNotMatchGivenOne'
+    | 'NoResolveMethodDefined';
 
 /**
  *  Errors from the scan module.

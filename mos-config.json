@@ -1,7 +1,22 @@
 {
   "delay": 30000,
-  "resolveMethod": "Address",
-  "choiceNames": [
-    "Coingecko ADAUSD"
-  ]
+  "resolveMethod": {
+    "address" :  {
+      "mosAddress": {
+        "address": "addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9"
+      },
+      "choiceNames":[ "Coingecko ADAUSD" ]
+      },
+    "charli3" : {
+      "choiceNames": "Charli3 ADAUSD",
+      "roleNames": "Charli3 Oracle",
+      "bridgeUtxo": {
+        "txHash": "1e8464fc6ac5ed38bfdd6f825919c704f3c3016716c0e7d17a0d44c4357bd29e",
+        "outputIndex": 0
+      },
+      "bridgeAddress": "addr_test1wpw0vwcfs7ga442vnp4skf8ecezauv3x5lxt6u0avnez2xqj4qkwc",
+      "feedAddress": "addr_test1wzn5ee2qaqvly3hx7e0nk3vhm240n5muq3plhjcnvx9ppjgf62u6a",
+      "feedAssetClass": "1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf074f7261636c6546656564"
+    }
+  }
 }
