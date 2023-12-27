@@ -35,7 +35,8 @@ type ConfigErrorNames =
     | 'ErrorFetchingOrParsingJSON'
     | 'UTxONotFound'
     | 'ScriptRefNotFoundInUTx0'
-    | 'CalculatedValidatorAddressDoesNotMatchGivenOne';
+    | 'CalculatedValidatorAddressDoesNotMatchGivenOne'
+    | 'NoResolveMethodDefined';
 
 /**
  *  Errors from the scan module.

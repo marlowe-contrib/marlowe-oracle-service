@@ -231,13 +231,14 @@ function getProviderEnvValue(network: Network): Provider {
  * @returns A promise resolving to the parsed MOS configuration.
  * @throws Error Throws an error if there's an issue reading or parsing the file.
  */
-async function fromFileMOSConfig(
-    filePath: string
-): Promise<MOSConfig<OutRef>> {
+async function fromFileMOSConfig(filePath: string): Promise<MOSConfig<OutRef>> {
     try {
         const fileContent = readFileSync(filePath, 'utf-8');
         const json = JSON.parse(fileContent);
         const parsedData = json as MOSConfig<OutRef>;
+
+        if (!parsedData.resolveMethod.address && !parsedData.resolveMethod.charli3)
+            throw new ConfigError('NoResolveMethodDefined');
 
         return parsedData;
     } catch (error) {
@@ -250,31 +251,36 @@ export async function setOracleConfig(
     mc: MOSConfig<OutRef>,
     lucid: Lucid
 ): Promise<MOSConfig<UTxO>> {
-    if (!(mc.resolveMethod.address || mc.resolveMethod.charli3))
-        throw new Error('NoResolveMethodDefined');
+    if (mc.resolveMethod.charli3) {
+        const bridgeUtxo: UTxO = (
+            await lucid.utxosByOutRef([mc.resolveMethod.charli3.bridgeUtxo])
+        )[0];
 
-    if (!mc.resolveMethod.charli3) return Promise.reject('NoCharli3Config');
+        if (!bridgeUtxo) throw new ConfigError('UTxONotFound');
 
-    const bridgeUtxo: UTxO = (
-        await lucid.utxosByOutRef([mc.resolveMethod.charli3.bridgeUtxo]))[0];
+        if (!bridgeUtxo.scriptRef)
+            throw new ConfigError('ScriptRefNotFoundInUTx0');
 
-    if (!bridgeUtxo) throw new ConfigError('UTxONotFound');
+        const bridgeAddress = lucid.utils.validatorToAddress(
+            bridgeUtxo.scriptRef
+        );
 
-    if (!bridgeUtxo.scriptRef) throw new ConfigError('ScriptRefNotFoundInUTx0');
+        if (bridgeAddress != mc.resolveMethod.charli3.bridgeAddress)
+            throw new ConfigError(
+                'CalculatedValidatorAddressDoesNotMatchGivenOne'
+            );
 
-    const bridgeAddress = lucid.utils.validatorToAddress(bridgeUtxo.scriptRef);
-
-    if (bridgeAddress != mc.resolveMethod.charli3.bridgeAddress)
-        throw new ConfigError('CalculatedValidatorAddressDoesNotMatchGivenOne');
-
-    return {
-        ...mc,
-        resolveMethod: {
-            ...mc.resolveMethod,
-            charli3: {
-                ...mc.resolveMethod.charli3,
-                bridgeUtxo: bridgeUtxo,
+        return {
+            ...mc,
+            resolveMethod: {
+                ...mc.resolveMethod,
+                charli3: {
+                    ...mc.resolveMethod.charli3,
+                    bridgeUtxo: bridgeUtxo,
+                },
             },
-        },
-    };
+        };
+    } else {
+        return mc as MOSConfig<UTxO>;
+    }
 }
