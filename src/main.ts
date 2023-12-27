@@ -1,6 +1,5 @@
-import { Lucid, MaestroConfig, UTxO } from 'lucid-cardano';
+import { Lucid, MaestroConfig } from 'lucid-cardano';
 import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
-import { Address } from 'marlowe-language-core-v1-txpipe';
 
 import {
     parseMOSConfig,
@@ -27,7 +26,7 @@ export async function main() {
         if (!mosConfig.resolveMethod.address)
             throw new Error('NoAddressConfig');
 
-        const mosEnv = setMarloweUTxO(rawMosEnv, lucid);
+        const mosEnv = await setMarloweUTxO(rawMosEnv, lucid);
 
         do {
             const activeContracts = await getActiveContracts(
@@ -44,7 +43,8 @@ export async function main() {
             const txHash = await buildAndSubmit(
                 client,
                 lucid,
-                applicableInputs
+                applicableInputs,
+                mosEnv
             );
             console.log('TxHash: ', txHash);
             await new Promise((r) => setTimeout(r, mosConfig.delay));

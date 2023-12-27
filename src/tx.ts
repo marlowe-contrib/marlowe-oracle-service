@@ -16,6 +16,8 @@ import {
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
 import { BuildTransactionError, throwAxiosError } from './error.ts';
+import { MOSEnv } from './config.ts';
+
 
 /**
  * Build the transactions that apply inputs to each contract, sign them
@@ -29,7 +31,8 @@ import { BuildTransactionError, throwAxiosError } from './error.ts';
 export async function buildAndSubmit(
     client: RestClient,
     lucid: Lucid,
-    applicableInputs: ApplyInputsToContractRequest[]
+    applicableInputs: ApplyInputsToContractRequest[],
+    mosEnv: MOSEnv<UTxO>
 ): Promise<string[]> {
     if (applicableInputs.length > 0) {
         try {
@@ -37,7 +40,11 @@ export async function buildAndSubmit(
                 return client
                     .applyInputsToContract(input)
                     .then((appliedInput) => {
-                        return processCbor(appliedInput.tx.cborHex, lucid);
+                        return processCbor(
+                            appliedInput.tx.cborHex,
+                            lucid,
+                            mosEnv
+                        );
                     });
             });
 
@@ -169,19 +176,17 @@ function getRefFromInput(input: C.TransactionInput): OutRef {
     return ref;
 }
 
-async function processCbor(cbor: string, lucid: Lucid): Promise<Tx> {
+async function processCbor(
+    cbor: string,
+    lucid: Lucid,
+    mosEnv: MOSEnv<UTxO>
+): Promise<Tx> {
     const transaction = C.Transaction.from_bytes(Buffer.from(cbor, 'hex'));
-
-    const refScriptRef = {
-        txHash: 'c59678b6892ba0fbeeaaec22d4cbde17026ff614ed47cea02c47752e5853ebc8',
-        outputIndex: 1,
-    };
-    const resScriptUtxo = await lucid.utxosByOutRef([refScriptRef]);
 
     const allMarloweInputs = await getMarloweInputs([transaction], lucid);
 
-    const newTx = translateToTx(transaction, allMarloweInputs, lucid);
-    newTx.readFrom(resScriptUtxo);
+    const newTx = translateToTx(transaction, allMarloweInputs, lucid, mosEnv);
+    newTx.readFrom([mosEnv.marloweValidatorUtxo]);
 
     return newTx;
 }
@@ -195,11 +200,9 @@ async function processCbor(cbor: string, lucid: Lucid): Promise<Tx> {
 function translateToTx(
     transaction: C.Transaction,
     inputs: UTxO[],
-    lucid: Lucid
+    lucid: Lucid,
+    mosEnv: MOSEnv<UTxO>
 ): Tx {
-    const marloweAddress: Address =
-        'addr_test1wrv9l2du900ajl27hk79u07xda68vgfugrppkua5zftlp8g0l9djk';
-
     let finalTx: Tx = new Tx(lucid);
     const utils = new Utils(lucid);
 
@@ -228,7 +231,7 @@ function translateToTx(
     const redeemerCbor = toHex(redeemer.data().to_bytes());
     finalTx.collectFrom([validInput], redeemerCbor);
 
-    finalTx.compose(processMarloweOutput(transaction, lucid, marloweAddress));
+    finalTx.compose(processMarloweOutput(transaction, lucid, mosEnv.marloweValidatorAddress));
 
     const slotFrom = transaction.body().validity_start_interval();
     const slotUntil = transaction.body().ttl();
@@ -273,7 +276,10 @@ export function processMarloweOutput(
 
     for (let i = 0; i < outputs.len(); i++) {
         const out = outputs.get(i);
-        if (out.address().to_bech32(undefined) === marloweAddress) {
+        if (
+            out.address().to_bech32(undefined) ===
+            marloweAddress
+        ) {
             outputsList.push(out);
         }
     }
@@ -294,7 +300,11 @@ export function processMarloweOutput(
         const assets = valueToAssets(out.amount());
 
         const outputData: OutputData = { asHash: datumCBOR };
-        finalTx.payToContract(marloweAddress, outputData, assets);
+        finalTx.payToContract(
+            marloweAddress,
+            outputData,
+            assets
+        );
     }
 
     return finalTx;

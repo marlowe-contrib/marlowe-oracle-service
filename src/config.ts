@@ -69,7 +69,7 @@ type MOSConfig<T> = {
  * Includes Marlowe Runtime URL, network information, and
  * provider details for the service.
  */
-type MOSEnv<T> = {
+export type MOSEnv<T> = {
     marloweRuntimeUrl: string;
     network: Network;
     provider: Provider;
