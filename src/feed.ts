@@ -6,8 +6,6 @@ import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
 
-type Map<T> = { [key: string]: T };
-
 type Currency = 'ADA' | 'USD';
 
 type CurrencyPair = {
@@ -19,10 +17,10 @@ type CurrencyPair = {
 /**
  * @description Currency pairs for which information can be provided by the respective sources
  */
-const KnownCurrencyPairs: Map<CurrencyPair> = {
-    'Coingecko ADAUSD': { source: 'Coingecko', from: 'ADA', to: 'USD' },
-    'Coingecko USDADA': { source: 'Coingecko', from: 'USD', to: 'ADA' },
-};
+const KnownCurrencyPairs = new Map([
+    ['Coingecko ADAUSD', { source: 'Coingecko', from: 'ADA', to: 'USD' }],
+    ['Coingecko USDADA', { source: 'Coingecko', from: 'USD', to: 'ADA' }],
+]);
 
 /**
  * @param mosAddress The address of the MOS
@@ -34,7 +32,7 @@ export async function getApplyInputs(
     mosAddress: Address,
     requests: OracleRequest[]
 ): Promise<ApplyInputsToContractRequest[]> {
-    const priceMap = await setPriceMap();
+    const priceMap = await setPriceMap(requests);
 
     const feeds = requests.map(async (request) => {
         const input = await feed(request, priceMap);
@@ -55,7 +53,7 @@ export async function getApplyInputs(
     psFeeds.map((res, idx) => {
         if (res.status === 'fulfilled') {
             console.log(res.value.inputs)
-            // fulfilled.push(res.value);
+            fulfilled.push(res.value);
         } else {
             console.log(res);
         }
@@ -71,17 +69,18 @@ export async function getApplyInputs(
  * (complete inputs to be applied to it).
  * @throws FeedError UnkownCurrencyPairOrSource
  */
-async function feed(request: OracleRequest, priceMap: Map<bigint> ): Promise<Input> {
+async function feed(
+    request: OracleRequest,
+    priceMap: Record<string, bigint>
+): Promise<Input> {
     try {
         const cn = request.choiceId.choice_name;
-        const curPair = KnownCurrencyPairs[cn];
-        if (!curPair)
-            throw new FeedError(
-                'UnknownCurrencyPairOrSource',
-                cn
-            );
+        const curPair = KnownCurrencyPairs.get(cn);
+        if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource', cn);
 
         const price = priceMap[cn];
+
+        if (!price) throw new Error('Undefined price for choice name');
 
         if (withinBounds(price, request.choiceBounds)) {
             const input: Input = makeInput(request.choiceId, price);
@@ -108,9 +107,7 @@ async function feed(request: OracleRequest, priceMap: Map<bigint> ): Promise<Inp
  * @throws FeedError ResultIsOutOfBounds
  * @throws FeedError UnknownCurrencyPair
  */
-async function getCoingeckoPrice(
-    curPair: CurrencyPair,
-): Promise<bigint> {
+async function getCoingeckoPrice(curPair: CurrencyPair): Promise<bigint> {
     const from = currencyToCoingecko(curPair.from);
     const to = currencyToCoingecko(curPair.to);
     var scaledResult = 0n;
@@ -130,7 +127,6 @@ async function getCoingeckoPrice(
                 'UnknownCurrencyPair',
                 curPair.from + curPair.to
             );
-            break;
         }
     }
     return scaledResult;
@@ -145,7 +141,6 @@ async function getCoingeckoPrice(
  * @throws FeedError Unknown base or quote currency for Coingecko query
  */
 async function queryCoingecko(from: string, to: string): Promise<number> {
-    console.log('Querying coingecko ...')
     type CoingeckoResponse = {
         [from: string]: {
             [to: string]: number;
@@ -211,19 +206,26 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
     return inputChoice;
 }
 
-async function setPriceMap(): Promise<Map<bigint>> {
-    let priceMap: Map<bigint> = {
-        'Coingecko ADAUSD': 0n
-    };
-    for (const [cn, curPair] of Object.entries(KnownCurrencyPairs)) {
+async function setPriceMap(
+    requests: OracleRequest[]
+): Promise<Record<string, bigint>> {
+    let requestedCN: Set<string> = new Set();
+    requests.map((req) => {
+        requestedCN.add(req.choiceId.choice_name);
+    });
+
+    let priceMap: Record<string, bigint> = {};
+    for (const cn of requestedCN) {
+        const curPair = KnownCurrencyPairs.get(cn);
+        if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource');
+
         let price = 0n;
         switch (curPair.source) {
             case 'Coingecko':
-                price = await getCoingeckoPrice(curPair);
+                price = await getCoingeckoPrice(curPair as CurrencyPair);
                 break;
         }
-
-        Object.assign(priceMap, {[cn]: price });
+        priceMap[cn] = price;
     }
 
     return priceMap;
