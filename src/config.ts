@@ -85,8 +85,7 @@ export type MOSEnv<T> = {
  * - MAESTRO_API_TOKEN xor BLOCKFROST_API_KEY
  * - SIGNING_KEY
  * - MARLOWE_VALIDATOR_ADDRESS
- * - MARLOWE_VALIDATOR_TX_HASH
- * - MARLOWE_VALIDATOR_OUTPUT_INDEX
+ * - MARLOWE_VALIDATOR_UTXO_REF
  * @returns Marlowe Oracle Service environment configuration
  */
 function getMOSEnv(): MOSEnv<OutRef> {
@@ -95,8 +94,9 @@ function getMOSEnv(): MOSEnv<OutRef> {
     const provider = getProviderEnvValue(network as Network);
     const signingKey = getEnvValue('SIGNING_KEY');
     const mvAddress = getEnvValue('MARLOWE_VALIDATOR_ADDRESS');
-    const mvUtxoRefHash = getEnvValue('MARLOWE_VALIDATOR_TX_HASH');
-    const mvUtxoRefIndex = getEnvValue('MARLOWE_VALIDATOR_OUTPUT_INDEX');
+    const mvUtxoRef = getEnvValue('MARLOWE_VALIDATOR_UTXO_REF');
+
+    const [txHash, outIndex] = mvUtxoRef.split('#');
 
     return {
         marloweRuntimeUrl: mrUrl,
@@ -105,8 +105,8 @@ function getMOSEnv(): MOSEnv<OutRef> {
         signingKey: signingKey,
         marloweValidatorAddress: mvAddress,
         marloweValidatorUtxo: {
-            txHash: mvUtxoRefHash,
-            outputIndex: +mvUtxoRefIndex,
+            txHash: txHash,
+            outputIndex: Number(outIndex),
         },
     };
 }
@@ -120,8 +120,7 @@ function getMOSEnv(): MOSEnv<OutRef> {
  * - MAESTRO_API_TOKEN xor BLOCKFROST_API_KEY
  * - SIGNING_KEY
  * - MARLOWE_VALIDATOR_ADDRESS
- * - MARLOWE_VALIDATOR_TX_HASH
- * - MARLOWE_VALIDATOR_OUTPUT_INDEX
+ * - MARLOWE_VALIDATOR_UTXO_REF
  * @returns Marlowe Oracle Service validated environment configuration
  * @throws Error
  */
