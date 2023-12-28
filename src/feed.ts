@@ -6,6 +6,8 @@ import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
 
+type Map<T> = { [key: string]: T };
+
 type Currency = 'ADA' | 'USD';
 
 type CurrencyPair = {
@@ -17,7 +19,7 @@ type CurrencyPair = {
 /**
  * @description Currency pairs for which information can be provided by the respective sources
  */
-const KnownCurrencyPairs: { [key: string]: CurrencyPair } = {
+const KnownCurrencyPairs: Map<CurrencyPair> = {
     'Coingecko ADAUSD': { source: 'Coingecko', from: 'ADA', to: 'USD' },
     'Coingecko USDADA': { source: 'Coingecko', from: 'USD', to: 'ADA' },
 };
@@ -32,8 +34,10 @@ export async function getApplyInputs(
     mosAddress: Address,
     requests: OracleRequest[]
 ): Promise<ApplyInputsToContractRequest[]> {
+    const priceMap = await setPriceMap();
+
     const feeds = requests.map(async (request) => {
-        const input = await feed(request);
+        const input = await feed(request, priceMap);
         const air: ApplyInputsToContractRequest = {
             contractId: request.contractId,
             changeAddress: addressBech32(mosAddress.address),
@@ -50,7 +54,8 @@ export async function getApplyInputs(
 
     psFeeds.map((res, idx) => {
         if (res.status === 'fulfilled') {
-            fulfilled.push(res.value);
+            console.log(res.value.inputs)
+            // fulfilled.push(res.value);
         } else {
             console.log(res);
         }
@@ -66,23 +71,24 @@ export async function getApplyInputs(
  * (complete inputs to be applied to it).
  * @throws FeedError UnkownCurrencyPairOrSource
  */
-async function feed(request: OracleRequest): Promise<Input> {
+async function feed(request: OracleRequest, priceMap: Map<bigint> ): Promise<Input> {
     try {
-        const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
+        const cn = request.choiceId.choice_name;
+        const curPair = KnownCurrencyPairs[cn];
         if (!curPair)
             throw new FeedError(
                 'UnknownCurrencyPairOrSource',
-                request.choiceId.choice_name
+                cn
             );
-        let price = 0n;
-        switch (curPair.source) {
-            case 'Coingecko':
-                price = await getCoingeckoPrice(curPair, request.choiceBounds);
-                break;
-        }
 
-        const input: Input = makeInput(request.choiceId, price);
-        return input;
+        const price = priceMap[cn];
+
+        if (withinBounds(price, request.choiceBounds)) {
+            const input: Input = makeInput(request.choiceId, price);
+            return input;
+        } else {
+            throw new FeedError('FeedResultIsOutOfBounds');
+        }
     } catch (e) {
         if (e instanceof FeedError) {
             console.log(e.name, e.message);
@@ -94,6 +100,43 @@ async function feed(request: OracleRequest): Promise<Input> {
 }
 
 /**
+ * Provides the price of a requested currencyPair via Coingecko. The price is returned
+ * multiplied by 100_000_000
+ * @param curPair Currency pair for the the desired exchange price
+ * @param bounds Numeric limits that the price has to be confied within
+ * @returns price as a scaled BigInt
+ * @throws FeedError ResultIsOutOfBounds
+ * @throws FeedError UnknownCurrencyPair
+ */
+async function getCoingeckoPrice(
+    curPair: CurrencyPair,
+): Promise<bigint> {
+    const from = currencyToCoingecko(curPair.from);
+    const to = currencyToCoingecko(curPair.to);
+    var scaledResult = 0n;
+    switch ([curPair.from, curPair.to].join('')) {
+        case 'ADAUSD': {
+            const result = await queryCoingecko(from, to);
+            scaledResult = BigInt(Math.round(result * 100_000_000));
+            break;
+        }
+        case 'USDADA': {
+            const result = await queryCoingecko(to, from);
+            scaledResult = BigInt(Math.round((1 / result) * 100_000_000));
+            break;
+        }
+        default: {
+            throw new FeedError(
+                'UnknownCurrencyPair',
+                curPair.from + curPair.to
+            );
+            break;
+        }
+    }
+    return scaledResult;
+}
+
+/**
  * Requests the price feed for a currency pair to the CoingeckoApi
  * @param from base currency
  * @param to quote currency
@@ -102,6 +145,7 @@ async function feed(request: OracleRequest): Promise<Input> {
  * @throws FeedError Unknown base or quote currency for Coingecko query
  */
 async function queryCoingecko(from: string, to: string): Promise<number> {
+    console.log('Querying coingecko ...')
     type CoingeckoResponse = {
         [from: string]: {
             [to: string]: number;
@@ -144,48 +188,6 @@ function currencyToCoingecko(c: Currency): string {
 }
 
 /**
- * Provides the price of a requested currencyPair via Coingecko. The price is returned
- * multiplied by 100_000_000
- * @param curPair Currency pair for the the desired exchange price
- * @param bounds Numeric limits that the price has to be confied within
- * @returns price as a scaled BigInt
- * @throws FeedError ResultIsOutOfBounds
- * @throws FeedError UnknownCurrencyPair
- */
-async function getCoingeckoPrice(
-    curPair: CurrencyPair,
-    bounds: Bound[]
-): Promise<bigint> {
-    const from = currencyToCoingecko(curPair.from);
-    const to = currencyToCoingecko(curPair.to);
-    var scaledResult = 0n;
-    switch ([curPair.from, curPair.to].join('')) {
-        case 'ADAUSD': {
-            const result = await queryCoingecko(from, to);
-            scaledResult = BigInt(Math.round(result * 100_000_000));
-            break;
-        }
-        case 'USDADA': {
-            const result = await queryCoingecko(to, from);
-            scaledResult = BigInt(Math.round((1 / result) * 100_000_000));
-            break;
-        }
-        default: {
-            throw new FeedError(
-                'UnknownCurrencyPair',
-                curPair.from + curPair.to
-            );
-            break;
-        }
-    }
-    if (withinBounds(scaledResult, bounds)) {
-        return scaledResult;
-    } else {
-        throw new FeedError('FeedResultIsOutOfBounds');
-    }
-}
-
-/**
  * Utility to check if a given number n is within the bounds for at least one element of the array
  * @param n bigint
  * @param bounds array of Bound
@@ -207,4 +209,22 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
         input_that_chooses_num: price,
     };
     return inputChoice;
+}
+
+async function setPriceMap(): Promise<Map<bigint>> {
+    let priceMap: Map<bigint> = {
+        'Coingecko ADAUSD': 0n
+    };
+    for (const [cn, curPair] of Object.entries(KnownCurrencyPairs)) {
+        let price = 0n;
+        switch (curPair.source) {
+            case 'Coingecko':
+                price = await getCoingeckoPrice(curPair);
+                break;
+        }
+
+        Object.assign(priceMap, {[cn]: price });
+    }
+
+    return priceMap;
 }
