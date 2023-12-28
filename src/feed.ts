@@ -80,7 +80,7 @@ async function feed(
 
         const price = priceMap[cn];
 
-        if (!price) throw new Error('Undefined price for choice name');
+        if (!price) throw new FeedError('PriceUndefineForChoiceName', cn);
 
         if (withinBounds(price, request.choiceBounds)) {
             const input: Input = makeInput(request.choiceId, price);
