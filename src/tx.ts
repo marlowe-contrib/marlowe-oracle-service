@@ -3,6 +3,8 @@ import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe
 import {
     Address,
     C,
+    Data,
+    Datum,
     ExternalWallet,
     Lucid,
     OutRef,
@@ -15,8 +17,210 @@ import {
     valueToAssets,
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
-import { BuildTransactionError, throwAxiosError } from './error.ts';
 import { MOSEnv } from './config.ts';
+import {
+    BuildTransactionError,
+    RequestError,
+    throwAxiosError,
+} from './error.ts';
+import { Input, IChoice, Party } from 'marlowe-language-core-v1-txpipe';
+import MLC from 'marlowe-language-core-v1-txpipe';
+import { TxOutRef, unTxOutRef } from '@marlowe.io/runtime-core';
+import { match, toUndefined } from 'fp-ts/lib/Option.js';
+import { ContractDetails } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/details';
+import { constUndefined } from 'fp-ts/lib/function.js';
+
+//TODO: Rename
+export type OurApplyRequest = {
+    version: string;
+    marloweData: Datum;
+    invalidBefore: Date;
+    invalidHereafter: Date;
+    inputs: Input[];
+};
+
+type SuccessApplyResponse = {
+    datumCborHex: string;
+    redeemerCborHex: string;
+};
+
+type ErrorApplyResponse = {
+    error: string;
+};
+
+//TODO: Comment
+function convertBigIntToNumber(obj: any): any {
+    if (typeof obj === 'bigint') {
+        return Number(obj);
+    } else if (typeof obj === 'object' && obj !== null) {
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                obj[key] = convertBigIntToNumber(obj[key]);
+            }
+        }
+    }
+    return obj;
+}
+
+export type ApplyResponse = SuccessApplyResponse | ErrorApplyResponse;
+
+/**
+ * Get the updated datum after doing an apply, using our own service.
+ *
+ * @param applyUrl Url of the apply service
+ * @param request request for the service
+ * @returns cbor of the updated datum or error
+ */
+export async function applyInput(
+    applyUrl: string,
+    request: OurApplyRequest
+): Promise<ApplyResponse> {
+    const response = await fetch(applyUrl, {
+        method: 'POST',
+        body: JSON.stringify(convertBigIntToNumber(request)),
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        },
+    });
+
+    if (!response.ok) {
+        throw new RequestError(`${response.status}`, response.statusText);
+    }
+
+    const result = (await response.json()) as ApplyResponse;
+
+    return result;
+}
+
+//TODO: Comment
+async function getAllUtxos(
+    client: RestClient,
+    lucid: Lucid,
+    requests: ApplyInputsToContractRequest[]
+): Promise<Map<ApplyInputsToContractRequest, UTxO>> {
+    let allDetails = new Map<ApplyInputsToContractRequest, ContractDetails>();
+    for await (const req of requests) {
+        try {
+            const cId = req.contractId;
+            const details = await client.getContractById(cId);
+            allDetails.set(req, details);
+        } catch (e) {
+            console.log('error at getAllUtxos: ', e);
+        }
+    }
+
+    let utxoRefs: OutRef[] = [];
+    allDetails.forEach((detail) => {
+        const utxo = toUndefined(detail.utxo);
+        if (utxo) {
+            const [hash, idx] = unTxOutRef(utxo).split('#');
+            const ref: OutRef = { txHash: hash, outputIndex: Number(idx) };
+            utxoRefs.push(ref);
+        }
+    });
+
+    const utxos = await lucid.utxosByOutRef(utxoRefs);
+
+    for await (const utxo of utxos) {
+        if (utxo.datumHash) {
+            const datumPD = await lucid.datumOf(utxo);
+            utxo.datum = Data.to(datumPD);
+        }
+    }
+
+    // Loop thorugh all utxos, and find in the details list the contractId that corresponds
+    let result = new Map<ApplyInputsToContractRequest, UTxO>();
+
+    for (const utxo of utxos) {
+        let foundDetail = false;
+        allDetails.forEach((detail, req) =>
+            match(constUndefined, (elem: TxOutRef) => {
+                const [hash, idx] = unTxOutRef(elem).split('#');
+                if (hash == utxo.txHash && Number(idx) == utxo.outputIndex) {
+                    foundDetail = true;
+                    result.set(req, utxo);
+                }
+            })(detail.utxo)
+        );
+        if (!foundDetail) {
+            console.log('No contract detail found for ref: ', utxo);
+        }
+    }
+
+    return result;
+}
+
+//TODO: Comment
+async function getApplyRequests(
+    lucid: Lucid,
+    applyUrl: string,
+    utxo: UTxO,
+    request: ApplyInputsToContractRequest
+): Promise<Tx | undefined> {
+    if (!utxo.datum) throw new BuildTransactionError('NoDatumFoundOnUTxO');
+
+    let newTx = undefined;
+
+    //Hotfix for script evaluation error. Remove once MAS is updated
+    const oldIBUNIX = (request.invalidBefore as Date).getTime();
+    const newIBUNIX = Math.floor(oldIBUNIX / 1000) * 1000;
+    const newIB = new Date(newIBUNIX);
+
+    const newRequest: OurApplyRequest = {
+        version: request.version ?? 'v1',
+        marloweData: utxo.datum,
+        invalidBefore: newIB,
+        invalidHereafter: request.invalidHereafter,
+        inputs: request.inputs,
+    };
+
+    const applyResponse = await applyInput(applyUrl, newRequest);
+
+    if ('error' in applyResponse) {
+        console.log(applyResponse.error);
+    } else {
+        newTx = new Tx(lucid);
+
+        // Get all required signers
+
+        const reqSigners = getSignersFromInputs(request.inputs);
+
+        for (const address of reqSigners) {
+            newTx.addSigner(address);
+        }
+
+        newTx.validFrom(newIBUNIX);
+        newTx.validTo(request.invalidHereafter);
+
+        newTx.collectFrom([utxo], applyResponse.redeemerCborHex);
+        newTx.payToContract(
+            utxo.address,
+            { asHash: applyResponse.datumCborHex },
+            utxo.assets
+        );
+    }
+
+    return newTx;
+}
+
+function getSignersFromInputs(inputs: Input[]): Address[] {
+    function isIChoice(value: Input): value is IChoice {
+        return (value as any).for_choice_id !== undefined;
+    }
+
+    function isAddress(value: Party): value is MLC.Address {
+        return (value as any).address !== undefined;
+    }
+
+    let allAddresses: Address[] = [];
+    for (const input of inputs) {
+        if (isIChoice(input) && isAddress(input.for_choice_id.choice_owner)) {
+            allAddresses.push(input.for_choice_id.choice_owner.address);
+        }
+    }
+    return allAddresses;
+}
 
 /**
  * Build the transactions that apply inputs to each contract, sign them
@@ -35,35 +239,39 @@ export async function buildAndSubmit(
 ): Promise<string[]> {
     if (applicableInputs.length > 0) {
         try {
-            const transactions = applicableInputs.map(async (input) => {
-                return client
-                    .applyInputsToContract(input)
-                    .then((appliedInput) => {
-                        return processCbor(
-                            appliedInput.tx.cborHex,
-                            lucid,
-                            mosEnv
-                        );
-                    });
+            const contractUtxos = await getAllUtxos(
+                client,
+                lucid,
+                applicableInputs
+            );
+
+            let allTxs: Tx[] = [];
+            for (const [req, utxo] of contractUtxos) {
+                const tx = await getApplyRequests(
+                    lucid,
+                    mosEnv.applyUrl,
+                    utxo,
+                    req
+                );
+                if (tx) allTxs.push(tx);
+            }
+
+            const refScriptRef = {
+                txHash: 'c59678b6892ba0fbeeaaec22d4cbde17026ff614ed47cea02c47752e5853ebc8',
+                outputIndex: 1,
+            };
+            const refScriptUtxo = await lucid.utxosByOutRef([refScriptRef]);
+
+            allTxs = allTxs.map((tx) => {
+                return tx.readFrom(refScriptUtxo);
             });
 
-            const psTransactions = await Promise.allSettled(transactions);
-
-            const fulfilled: Tx[] = [];
-
-            psTransactions.forEach((res, idx) => {
-                if (res.status === 'fulfilled') {
-                    fulfilled.push(res.value);
-                } else {
-                    console.log(res);
-                }
-            });
-
-            const completedTxs = await balanceParallel(fulfilled, lucid);
+            const completedTxs = await balanceParallel(allTxs, lucid);
 
             const signedTxs = completedTxs.map((tx) => {
                 return tx.sign();
             });
+
             const txHashes = signedTxs.map(async (signedTx) => {
                 return (await signedTx.complete()).submit();
             });
@@ -88,6 +296,7 @@ export async function buildAndSubmit(
             } else if (error instanceof BuildTransactionError) {
                 console.log(error.name, error.message);
             }
+            console.log('UnknownError: ', error);
             return ['Error occurred'];
         }
     } else {

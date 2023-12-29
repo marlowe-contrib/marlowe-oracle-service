@@ -85,7 +85,8 @@ type BuildTransactionErrorNames =
     | 'MoreThanOneRedeemerInTransaction.ExpectedJustOne'
     | 'NoTransactionInputFoundOnInputsList'
     | 'MarloweOutputWithoutDatum'
-    | 'MoreThanOneMarloweContractOutput';
+    | 'MoreThanOneMarloweContractOutput'
+    | 'NoDatumFoundOnUTxO';
 
 /**
  * Http requests errors.
