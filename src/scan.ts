@@ -106,6 +106,11 @@ export async function getActiveContracts(
     }
 
     const currentTime: Date = new Date();
+
+    const timeBefore5Minutes: Date = new Date(
+        currentTime.getTime() - 5 * 60 * 1000
+    );
+
     const timeAfter5Minutes: Date = new Date(
         currentTime.getTime() + 5 * 60 * 1000
     );
@@ -114,7 +119,7 @@ export async function getActiveContracts(
         client
             .getNextStepsForContract(
                 contract.contractId,
-                mkEnvironment(currentTime)(timeAfter5Minutes),
+                mkEnvironment(timeBefore5Minutes)(timeAfter5Minutes),
                 []
             )()
             .then((nextAction) =>
@@ -141,7 +146,7 @@ export async function getActiveContracts(
                                       choiceId: choices[0].for_choice,
                                       choiceBounds:
                                           choices[0].can_choose_between,
-                                      invalidBefore: currentTime,
+                                      invalidBefore: timeBefore5Minutes,
                                       invalidHereafter: timeAfter5Minutes,
                                   });
                         }
