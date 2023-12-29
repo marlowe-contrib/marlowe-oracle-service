@@ -52,7 +52,6 @@ export async function getApplyInputs(
 
     psFeeds.map((res, idx) => {
         if (res.status === 'fulfilled') {
-            console.log(res.value.inputs)
             fulfilled.push(res.value);
         } else {
             console.log(res);
