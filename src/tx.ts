@@ -8,13 +8,9 @@ import {
     ExternalWallet,
     Lucid,
     OutRef,
-    OutputData,
     Tx,
     TxComplete,
     UTxO,
-    Utils,
-    toHex,
-    valueToAssets,
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
 import { MOSEnv } from './config.ts';
@@ -305,74 +301,6 @@ export async function buildAndSubmit(
 }
 
 /**
- * Finds a datum inside a transaction that corresponds with the given hash
- * @param hash hash to look for
- * @param transaction transaction where to look for the datum
- * @returns The Datum whose hash is the same as the given hash
- * @throws NoDatumsInTx
- * @throws NoDatumMatchesHash
- */
-function findDatumFromHash(
-    hash: string,
-    transaction: C.Transaction
-): C.PlutusData {
-    const allDatums = transaction.witness_set().plutus_data();
-    if (!allDatums)
-        throw new BuildTransactionError('NoDatumsFoundInTransaction');
-
-    for (let i = 0; i < allDatums.len(); i++) {
-        const datum = allDatums.get(i);
-        if (C.hash_plutus_data(datum).to_hex() === hash) {
-            return datum;
-        }
-    }
-
-    throw new BuildTransactionError('NoDatumFoundForDatumHash', hash);
-}
-
-/**
- * Retrieves the CML Redeemer in a CML Transaction.
- * @param transaction CML Transaction to parse
- * @returns The only redeemer in the transaction
- * @throws NoRedeemerInTransactionError
- * @throws MoreThanOneRedeemerInTransactionError
- */
-function getOnlyRedeemerFromTransaction(
-    transaction: C.Transaction
-): C.Redeemer {
-    const redeemers = transaction.witness_set().redeemers();
-
-    if (!redeemers)
-        throw new BuildTransactionError('NoRedeemerInTransaction.ExpectedOne');
-
-    if (redeemers.len() > 1)
-        throw new BuildTransactionError(
-            'MoreThanOneRedeemerInTransaction.ExpectedJustOne'
-        );
-    return redeemers.get(0);
-}
-
-/**
- * Gets the marlowe contract UTxOs from the inputs inside a list of transactions
- * @param transactions All the CML transactions to parse
- * @returns A list of all marlowe contract UTxOs
- */
-async function getMarloweInputs(
-    transactions: C.Transaction[],
-    lucid: Lucid
-): Promise<UTxO[]> {
-    const utxoRefs = transactions.map((tx) => {
-        const redeemer = getOnlyRedeemerFromTransaction(tx);
-        const inputIndex = redeemer.index();
-        const input = tx.body().inputs().get(Number(inputIndex.to_str()));
-
-        return getRefFromInput(input);
-    });
-
-    return lucid.utxosByOutRef(utxoRefs);
-}
-
-/**
  * Gets the OutRef from a CML TransactionInput
  * @param input The CML TransactionInput to parse
  * @returns the corresponding OutRef
@@ -382,135 +310,6 @@ function getRefFromInput(input: C.TransactionInput): OutRef {
     const idx = Number(input.index().to_str());
     const ref: OutRef = { txHash: txId, outputIndex: idx };
     return ref;
-}
-
-async function processCbor(
-    cbor: string,
-    lucid: Lucid,
-    mosEnv: MOSEnv<UTxO>
-): Promise<Tx> {
-    const transaction = C.Transaction.from_bytes(Buffer.from(cbor, 'hex'));
-
-    const allMarloweInputs = await getMarloweInputs([transaction], lucid);
-
-    const newTx = translateToTx(transaction, allMarloweInputs, lucid, mosEnv);
-    newTx.readFrom([mosEnv.marloweValidatorUtxo]);
-
-    return newTx;
-}
-
-/**
- * Translates a CML transaction that is the result of calling
- * applyInputsToContract to a Lucid transaction
- * @param transaction The CML transaction to translate
- * @returns The Lucid transaction
- */
-function translateToTx(
-    transaction: C.Transaction,
-    inputs: UTxO[],
-    lucid: Lucid,
-    mosEnv: MOSEnv<UTxO>
-): Tx {
-    let finalTx: Tx = new Tx(lucid);
-    const utils = new Utils(lucid);
-
-    const redeemer = getOnlyRedeemerFromTransaction(transaction);
-
-    const txInputs = transaction.body().inputs();
-    let validInput: UTxO | undefined = undefined;
-
-    for (let i = 0; i < txInputs.len(); i++) {
-        const input = txInputs.get(i);
-        const ref = getRefFromInput(input);
-
-        if (!validInput) {
-            validInput = inputs.find((utxo) => {
-                return (
-                    utxo.outputIndex === ref.outputIndex &&
-                    utxo.txHash === ref.txHash
-                );
-            });
-        }
-    }
-
-    if (!validInput)
-        throw new BuildTransactionError('NoTransactionInputFoundOnInputsList');
-
-    const redeemerCbor = toHex(redeemer.data().to_bytes());
-    finalTx.collectFrom([validInput], redeemerCbor);
-
-    finalTx.compose(
-        processMarloweOutput(transaction, lucid, mosEnv.marloweValidatorAddress)
-    );
-
-    const slotFrom = transaction.body().validity_start_interval();
-    const slotUntil = transaction.body().ttl();
-
-    const from: number = utils.slotToUnixTime(Number(slotFrom!.to_str()));
-    const until: number = utils.slotToUnixTime(Number(slotUntil!.to_str()));
-
-    finalTx.validFrom(from);
-    finalTx.validTo(until);
-
-    const requiredSigners = transaction.body().required_signers();
-
-    if (requiredSigners) {
-        for (let i = 0; i < requiredSigners?.len(); i++) {
-            const reqSigner = requiredSigners?.get(i);
-            const key = reqSigner.to_hex();
-            finalTx.addSignerKey(key);
-        }
-    }
-
-    return finalTx;
-}
-
-/**
- * Given a CML Transaction, create a Lucid Tx that only has the marlowe output.
- * Fails if there's more than one output at the marlowe address or if the output
- * doesn't have a datum.
- * @param transaction CML transaction to process
- * @param lucid lucid instance
- * @param marloweAddress Address of the marlowe validator
- * @returns The Lucid Tx with either one or none outputs
- * @throws BuildTransactionError
- */
-export function processMarloweOutput(
-    transaction: C.Transaction,
-    lucid: Lucid,
-    marloweAddress: Address
-): Tx {
-    const outputs = transaction.body().outputs();
-    let finalTx: Tx = new Tx(lucid);
-    let outputsList: C.TransactionOutput[] = [];
-
-    for (let i = 0; i < outputs.len(); i++) {
-        const out = outputs.get(i);
-        if (out.address().to_bech32(undefined) === marloweAddress) {
-            outputsList.push(out);
-        }
-    }
-
-    if (outputsList.length > 1)
-        throw new BuildTransactionError('MoreThanOneMarloweContractOutput');
-
-    if (outputsList.length === 1) {
-        const out = outputsList[0];
-
-        const datumHash = out.datum()?.as_data_hash()?.to_hex();
-
-        if (!datumHash)
-            throw new BuildTransactionError('MarloweOutputWithoutDatum');
-
-        const datum = findDatumFromHash(datumHash, transaction);
-        const datumCBOR = toHex(datum.to_bytes());
-        const assets = valueToAssets(out.amount());
-
-        const outputData: OutputData = { asHash: datumCBOR };
-        finalTx.payToContract(marloweAddress, outputData, assets);
-    }
-
-    return finalTx;
 }
 
 /**
