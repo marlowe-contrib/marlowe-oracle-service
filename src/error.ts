@@ -64,7 +64,7 @@ type FeedErrorNames =
     | 'FeedResultIsOutOfBounds'
     | 'UnknownBaseCurrencyForCGQuery'
     | 'UnknownQuoteCurrencyForCGQuery'
-    | 'PriceUndefineForChoiceName'
+    | 'PriceUndefinedForChoiceName'
     | 'UnknownError';
 
 /**

@@ -79,7 +79,7 @@ async function feed(
 
         const price = priceMap[cn];
 
-        if (!price) throw new FeedError('PriceUndefineForChoiceName', cn);
+        if (!price) throw new FeedError('PriceUndefinedForChoiceName', cn);
 
         if (withinBounds(price, request.choiceBounds)) {
             const input: Input = makeInput(request.choiceId, price);
@@ -145,7 +145,7 @@ async function queryCoingecko(from: string, to: string): Promise<number> {
             [to: string]: number;
         };
     };
-    const cgApi = `https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd`;
+    const cgApi = `https://api.coingecko.com/api/v3/simple/price?ids=${from}&vs_currencies=${to}`;
     const response = await fetch(cgApi, {
         method: 'GET',
         headers: {
@@ -205,6 +205,12 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
     return inputChoice;
 }
 
+/**
+ * Queries and creates a map that stores the price for every ChoiceName, to
+ * avoid having to query the source multiple times for the same choice names.
+ * @param requests List of Oracle Requests
+ * @returns Record containing the price for each ChoiceName
+ */
 async function setPriceMap(
     requests: OracleRequest[]
 ): Promise<Record<string, bigint>> {
