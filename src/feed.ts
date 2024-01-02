@@ -17,10 +17,10 @@ type CurrencyPair = {
 /**
  * @description Currency pairs for which information can be provided by the respective sources
  */
-const KnownCurrencyPairs: { [key: string]: CurrencyPair } = {
-    'Coingecko ADAUSD': { source: 'Coingecko', from: 'ADA', to: 'USD' },
-    'Coingecko USDADA': { source: 'Coingecko', from: 'USD', to: 'ADA' },
-};
+const KnownCurrencyPairs = new Map([
+    ['Coingecko ADAUSD', { source: 'Coingecko', from: 'ADA', to: 'USD' }],
+    ['Coingecko USDADA', { source: 'Coingecko', from: 'USD', to: 'ADA' }],
+]);
 
 /**
  * @param mosAddress The address of the MOS
@@ -32,8 +32,10 @@ export async function getApplyInputs(
     mosAddress: Address,
     requests: OracleRequest[]
 ): Promise<ApplyInputsToContractRequest[]> {
+    const priceMap = await setPriceMap(requests);
+
     const feeds = requests.map(async (request) => {
-        const input = await feed(request);
+        const input = await feed(request, priceMap);
         const air: ApplyInputsToContractRequest = {
             contractId: request.contractId,
             changeAddress: addressBech32(mosAddress.address),
@@ -66,23 +68,25 @@ export async function getApplyInputs(
  * (complete inputs to be applied to it).
  * @throws FeedError UnkownCurrencyPairOrSource
  */
-async function feed(request: OracleRequest): Promise<Input> {
+async function feed(
+    request: OracleRequest,
+    priceMap: Record<string, bigint>
+): Promise<Input> {
     try {
-        const curPair = KnownCurrencyPairs[request.choiceId.choice_name];
-        if (!curPair)
-            throw new FeedError(
-                'UnknownCurrencyPairOrSource',
-                request.choiceId.choice_name
-            );
-        let price = 0n;
-        switch (curPair.source) {
-            case 'Coingecko':
-                price = await getCoingeckoPrice(curPair, request.choiceBounds);
-                break;
-        }
+        const cn = request.choiceId.choice_name;
+        const curPair = KnownCurrencyPairs.get(cn);
+        if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource', cn);
 
-        const input: Input = makeInput(request.choiceId, price);
-        return input;
+        const price = priceMap[cn];
+
+        if (!price) throw new FeedError('PriceUndefinedForChoiceName', cn);
+
+        if (withinBounds(price, request.choiceBounds)) {
+            const input: Input = makeInput(request.choiceId, price);
+            return input;
+        } else {
+            throw new FeedError('FeedResultIsOutOfBounds');
+        }
     } catch (e) {
         if (e instanceof FeedError) {
             console.log(e.name, e.message);
@@ -91,6 +95,40 @@ async function feed(request: OracleRequest): Promise<Input> {
             return Promise.reject(e);
         }
     }
+}
+
+/**
+ * Provides the price of a requested currencyPair via Coingecko. The price is returned
+ * multiplied by 100_000_000
+ * @param curPair Currency pair for the the desired exchange price
+ * @param bounds Numeric limits that the price has to be confied within
+ * @returns price as a scaled BigInt
+ * @throws FeedError ResultIsOutOfBounds
+ * @throws FeedError UnknownCurrencyPair
+ */
+async function getCoingeckoPrice(curPair: CurrencyPair): Promise<bigint> {
+    const from = currencyToCoingecko(curPair.from);
+    const to = currencyToCoingecko(curPair.to);
+    var scaledResult = 0n;
+    switch ([curPair.from, curPair.to].join('')) {
+        case 'ADAUSD': {
+            const result = await queryCoingecko(from, to);
+            scaledResult = BigInt(Math.round(result * 100_000_000));
+            break;
+        }
+        case 'USDADA': {
+            const result = await queryCoingecko(to, from);
+            scaledResult = BigInt(Math.round((1 / result) * 100_000_000));
+            break;
+        }
+        default: {
+            throw new FeedError(
+                'UnknownCurrencyPair',
+                curPair.from + curPair.to
+            );
+        }
+    }
+    return scaledResult;
 }
 
 /**
@@ -107,7 +145,7 @@ async function queryCoingecko(from: string, to: string): Promise<number> {
             [to: string]: number;
         };
     };
-    const cgApi = `https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd`;
+    const cgApi = `https://api.coingecko.com/api/v3/simple/price?ids=${from}&vs_currencies=${to}`;
     const response = await fetch(cgApi, {
         method: 'GET',
         headers: {
@@ -144,48 +182,6 @@ function currencyToCoingecko(c: Currency): string {
 }
 
 /**
- * Provides the price of a requested currencyPair via Coingecko. The price is returned
- * multiplied by 100_000_000
- * @param curPair Currency pair for the the desired exchange price
- * @param bounds Numeric limits that the price has to be confied within
- * @returns price as a scaled BigInt
- * @throws FeedError ResultIsOutOfBounds
- * @throws FeedError UnknownCurrencyPair
- */
-async function getCoingeckoPrice(
-    curPair: CurrencyPair,
-    bounds: Bound[]
-): Promise<bigint> {
-    const from = currencyToCoingecko(curPair.from);
-    const to = currencyToCoingecko(curPair.to);
-    var scaledResult = 0n;
-    switch ([curPair.from, curPair.to].join('')) {
-        case 'ADAUSD': {
-            const result = await queryCoingecko(from, to);
-            scaledResult = BigInt(Math.round(result * 100_000_000));
-            break;
-        }
-        case 'USDADA': {
-            const result = await queryCoingecko(to, from);
-            scaledResult = BigInt(Math.round((1 / result) * 100_000_000));
-            break;
-        }
-        default: {
-            throw new FeedError(
-                'UnknownCurrencyPair',
-                curPair.from + curPair.to
-            );
-            break;
-        }
-    }
-    if (withinBounds(scaledResult, bounds)) {
-        return scaledResult;
-    } else {
-        throw new FeedError('FeedResultIsOutOfBounds');
-    }
-}
-
-/**
  * Utility to check if a given number n is within the bounds for at least one element of the array
  * @param n bigint
  * @param bounds array of Bound
@@ -207,4 +203,35 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
         input_that_chooses_num: price,
     };
     return inputChoice;
+}
+
+/**
+ * Queries and creates a map that stores the price for every ChoiceName, to
+ * avoid having to query the source multiple times for the same choice names.
+ * @param requests List of Oracle Requests
+ * @returns Record containing the price for each ChoiceName
+ */
+async function setPriceMap(
+    requests: OracleRequest[]
+): Promise<Record<string, bigint>> {
+    let requestedCN: Set<string> = new Set();
+    requests.map((req) => {
+        requestedCN.add(req.choiceId.choice_name);
+    });
+
+    let priceMap: Record<string, bigint> = {};
+    for (const cn of requestedCN) {
+        const curPair = KnownCurrencyPairs.get(cn);
+        if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource');
+
+        let price = 0n;
+        switch (curPair.source) {
+            case 'Coingecko':
+                price = await getCoingeckoPrice(curPair as CurrencyPair);
+                break;
+        }
+        priceMap[cn] = price;
+    }
+
+    return priceMap;
 }
