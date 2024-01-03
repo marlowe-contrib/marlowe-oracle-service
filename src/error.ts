@@ -36,7 +36,8 @@ type ConfigErrorNames =
     | 'UTxONotFound'
     | 'ScriptRefNotFoundInUTxO'
     | 'CalculatedValidatorAddressDoesNotMatchGivenOne'
-    | 'NoResolveMethodDefined';
+    | 'NoResolveMethodDefined'
+    | 'InvalidUTxORefForMarloweValidator';
 
 /**
  *  Errors from the scan module.

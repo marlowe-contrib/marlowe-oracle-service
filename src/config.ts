@@ -98,6 +98,9 @@ function getMOSEnv(): MOSEnv<OutRef> {
 
     const [txHash, outIndex] = mvUtxoRef.split('#');
 
+    if (!txHash || !outIndex)
+        throw new ConfigError('InvalidUTxORefForMarloweValidator');
+
     return {
         marloweRuntimeUrl: mrUrl,
         network: network as Network,
