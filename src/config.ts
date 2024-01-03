@@ -76,6 +76,7 @@ export type MOSEnv<T> = {
     signingKey: PrivateKey;
     marloweValidatorAddress: string;
     marloweValidatorUtxo: T;
+    applyUrl: string;
 };
 
 /**
@@ -95,6 +96,7 @@ function getMOSEnv(): MOSEnv<OutRef> {
     const signingKey = getEnvValue('SIGNING_KEY');
     const mvAddress = getEnvValue('MARLOWE_VALIDATOR_ADDRESS');
     const mvUtxoRef = getEnvValue('MARLOWE_VALIDATOR_UTXO_REF');
+    const applyUrl = getEnvValue('APPLY_URL');
 
     const [txHash, outIndex] = mvUtxoRef.split('#');
 
@@ -111,6 +113,7 @@ function getMOSEnv(): MOSEnv<OutRef> {
             txHash: txHash,
             outputIndex: Number(outIndex),
         },
+        applyUrl: applyUrl,
     };
 }
 

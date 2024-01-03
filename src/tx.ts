@@ -3,6 +3,8 @@ import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe
 import {
     Address,
     C,
+    Data,
+    Datum,
     ExternalWallet,
     Lucid,
     OutRef,
@@ -10,13 +12,233 @@ import {
     Tx,
     TxComplete,
     UTxO,
-    Utils,
     toHex,
     valueToAssets,
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
-import { BuildTransactionError, throwAxiosError } from './error.ts';
 import { MOSEnv } from './config.ts';
+import {
+    BuildTransactionError,
+    RequestError,
+    throwAxiosError,
+} from './error.ts';
+import { Input, IChoice, Party } from 'marlowe-language-core-v1-txpipe';
+import { Payment } from 'marlowe-language-core-v1-txpipe/dist/esm/transaction.ts';
+import MLC from 'marlowe-language-core-v1-txpipe';
+import { TxOutRef, unTxOutRef } from '@marlowe.io/runtime-core';
+import { match, toUndefined } from 'fp-ts/lib/Option.js';
+import { ContractDetails } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/details';
+import { constUndefined } from 'fp-ts/lib/function.js';
+
+// The request and response types for the Marlowe Apply Service (MAS)
+export type MASRequest = {
+    version: string;
+    marloweData: Datum;
+    invalidBefore: Date;
+    invalidHereafter: Date;
+    inputs: Input[];
+};
+
+type MASSuccessResponse = {
+    datumCborHex: string;
+    redeemerCborHex: string;
+    payments: Payment[];
+};
+
+type MASErrorResponse = {
+    error: string;
+};
+
+export type MASResponse = MASSuccessResponse | MASErrorResponse;
+
+//This function goes over all fields of an object and changes any bigint field
+// to a number. Used for the applyInput function.
+function convertBigIntToNumber(obj: any): any {
+    if (typeof obj === 'bigint') {
+        return Number(obj);
+    } else if (typeof obj === 'object' && obj !== null) {
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                obj[key] = convertBigIntToNumber(obj[key]);
+            }
+        }
+    }
+    return obj;
+}
+
+/**
+ * Get the updated datum after doing an apply, using our own service.
+ *
+ * @param applyUrl Url of the apply service
+ * @param request request for the service
+ * @returns cbor of the updated datum or error
+ */
+export async function applyInput(
+    applyUrl: string,
+    request: MASRequest
+): Promise<MASResponse> {
+    const response = await fetch(applyUrl, {
+        method: 'POST',
+        body: JSON.stringify(convertBigIntToNumber(request)),
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        },
+    });
+
+    if (!response.ok) {
+        throw new RequestError(`${response.status}`, response.statusText);
+    }
+
+    const result = (await response.json()) as MASResponse;
+
+    return result;
+}
+
+/**
+ * Given a list of requests, fetches the utxo of the corresponding contract.
+ * @param client Marlowe Rest Client
+ * @param lucid Intance of Luicd initiated with a provider
+ * @param requests List of requests to process
+ * @returns A map matching each request to a UTxO
+ */
+async function getAllUtxos(
+    client: RestClient,
+    lucid: Lucid,
+    requests: ApplyInputsToContractRequest[]
+): Promise<Map<ApplyInputsToContractRequest, UTxO>> {
+    let allDetails = new Map<ApplyInputsToContractRequest, ContractDetails>();
+    for await (const req of requests) {
+        try {
+            const cId = req.contractId;
+            const details = await client.getContractById(cId);
+            allDetails.set(req, details);
+        } catch (e) {
+            console.log('error at getAllUtxos: ', e);
+        }
+    }
+
+    let utxoRefs: OutRef[] = [];
+    allDetails.forEach((detail) => {
+        const utxo = toUndefined(detail.utxo);
+        if (utxo) {
+            const [hash, idx] = unTxOutRef(utxo).split('#');
+            const ref: OutRef = { txHash: hash, outputIndex: Number(idx) };
+            utxoRefs.push(ref);
+        }
+    });
+
+    const utxos = await lucid.utxosByOutRef(utxoRefs);
+
+    for await (const utxo of utxos) {
+        if (utxo.datumHash) {
+            const datumPD = await lucid.datumOf(utxo);
+            utxo.datum = Data.to(datumPD);
+        }
+    }
+
+    // Loop thorugh all utxos, and find in the details list the contractId that corresponds
+    let result = new Map<ApplyInputsToContractRequest, UTxO>();
+
+    for (const utxo of utxos) {
+        let foundDetail = false;
+        allDetails.forEach((detail, req) =>
+            match(constUndefined, (elem: TxOutRef) => {
+                const [hash, idx] = unTxOutRef(elem).split('#');
+                if (hash == utxo.txHash && Number(idx) == utxo.outputIndex) {
+                    foundDetail = true;
+                    result.set(req, utxo);
+                }
+            })(detail.utxo)
+        );
+        if (!foundDetail) {
+            console.log('No contract detail found for ref: ', utxo);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Uses the Marlowe Apply Service (MAS) to calculate the updated datum and build
+ * the process tx.
+ * @param lucid Lucid instance initiated with a provider
+ * @param applyUrl The url of the MAS
+ * @param utxo The contract utxo
+ * @param request the apply request for that contract
+ * @returns The Tx that applies the request or undefined if it wasn't possible
+ * to do the apply
+ */
+async function getApplyRequests(
+    lucid: Lucid,
+    applyUrl: string,
+    utxo: UTxO,
+    request: ApplyInputsToContractRequest
+): Promise<Tx | undefined> {
+    if (!utxo.datum) throw new BuildTransactionError('NoDatumFoundOnUTxO');
+
+    let newTx = undefined;
+
+    //Hotfix for script evaluation error. Remove once MAS is updated
+    const oldIBUNIX = (request.invalidBefore as Date).getTime();
+    const newIBUNIX = Math.floor(oldIBUNIX / 1000) * 1000;
+    const newIB = new Date(newIBUNIX);
+
+    const newRequest: MASRequest = {
+        version: request.version ?? 'v1',
+        marloweData: utxo.datum,
+        invalidBefore: newIB,
+        invalidHereafter: request.invalidHereafter,
+        inputs: request.inputs,
+    };
+
+    const applyResponse = await applyInput(applyUrl, newRequest);
+    if ('error' in applyResponse) {
+        console.log(applyResponse.error);
+    } else if (applyResponse.payments.length > 0) {
+        console.log('Found payments. Ignoring this tx.');
+    } else {
+        newTx = new Tx(lucid);
+
+        // Get all required signers
+
+        const reqSigners = getSignersFromInputs(request.inputs);
+
+        for (const address of reqSigners) {
+            newTx.addSigner(address);
+        }
+
+        newTx.validFrom(newIBUNIX);
+        newTx.validTo(request.invalidHereafter);
+
+        newTx.collectFrom([utxo], applyResponse.redeemerCborHex);
+        newTx.payToContract(
+            utxo.address,
+            { asHash: applyResponse.datumCborHex },
+            utxo.assets
+        );
+    }
+
+    return newTx;
+}
+
+function getSignersFromInputs(inputs: Input[]): Address[] {
+    function isIChoice(value: Input): value is IChoice {
+        return (value as any).for_choice_id !== undefined;
+    }
+
+    function isAddress(value: Party): value is MLC.Address {
+        return (value as any).address !== undefined;
+    }
+
+    let allAddresses: Address[] = [];
+    for (const input of inputs) {
+        if (isIChoice(input) && isAddress(input.for_choice_id.choice_owner)) {
+            allAddresses.push(input.for_choice_id.choice_owner.address);
+        }
+    }
+    return allAddresses;
+}
 
 /**
  * Build the transactions that apply inputs to each contract, sign them
@@ -35,35 +257,33 @@ export async function buildAndSubmit(
 ): Promise<string[]> {
     if (applicableInputs.length > 0) {
         try {
-            const transactions = applicableInputs.map(async (input) => {
-                return client
-                    .applyInputsToContract(input)
-                    .then((appliedInput) => {
-                        return processCbor(
-                            appliedInput.tx.cborHex,
-                            lucid,
-                            mosEnv
-                        );
-                    });
+            const contractUtxos = await getAllUtxos(
+                client,
+                lucid,
+                applicableInputs
+            );
+
+            let allTxs: Tx[] = [];
+            for (const [req, utxo] of contractUtxos) {
+                const tx = await getApplyRequests(
+                    lucid,
+                    mosEnv.applyUrl,
+                    utxo,
+                    req
+                );
+                if (tx) allTxs.push(tx);
+            }
+
+            allTxs = allTxs.map((tx) => {
+                return tx.readFrom([mosEnv.marloweValidatorUtxo]);
             });
 
-            const psTransactions = await Promise.allSettled(transactions);
-
-            const fulfilled: Tx[] = [];
-
-            psTransactions.forEach((res, idx) => {
-                if (res.status === 'fulfilled') {
-                    fulfilled.push(res.value);
-                } else {
-                    console.log(res);
-                }
-            });
-
-            const completedTxs = await balanceParallel(fulfilled, lucid);
+            const completedTxs = await balanceParallel(allTxs, lucid);
 
             const signedTxs = completedTxs.map((tx) => {
                 return tx.sign();
             });
+
             const txHashes = signedTxs.map(async (signedTx) => {
                 return (await signedTx.complete()).submit();
             });
@@ -88,10 +308,62 @@ export async function buildAndSubmit(
             } else if (error instanceof BuildTransactionError) {
                 console.log(error.name, error.message);
             }
+            console.log('UnknownError: ', error);
             return ['Error occurred'];
         }
     } else {
         return ['No inputs to apply'];
+    }
+}
+
+/**
+ * Gets the OutRef from a CML TransactionInput
+ * @param input The CML TransactionInput to parse
+ * @returns the corresponding OutRef
+ */
+function getRefFromInput(input: C.TransactionInput): OutRef {
+    const txId = input.transaction_id().to_hex();
+    const idx = Number(input.index().to_str());
+    const ref: OutRef = { txHash: txId, outputIndex: idx };
+    return ref;
+}
+
+/**
+ * Balances a list of txs, making sure than the utxos used for balancing don't
+ * overlap
+ * @param txs transactions to balance
+ * @param lucid lucid instance
+ * @returns The balanced transactions
+ */
+async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
+    const wallet = lucid.wallet;
+    let completedTxs: TxComplete[] = [];
+
+    try {
+        const address = await wallet.address();
+        let utxos = await wallet.getUtxos();
+
+        for (var tx of txs) {
+            const external: ExternalWallet = { address: address, utxos: utxos };
+            lucid.selectWalletFrom(external);
+
+            const completedTx = await tx.complete({ nativeUplc: false });
+            completedTxs.push(completedTx);
+
+            const usedUtxos = completedTx.txComplete.body().inputs();
+            utxos = utxos.filter((utxo) => {
+                const ref: OutRef = {
+                    txHash: utxo.txHash,
+                    outputIndex: utxo.outputIndex,
+                };
+                return !isIncluded(ref, usedUtxos);
+            });
+        }
+    } catch (err) {
+        console.log(err);
+    } finally {
+        lucid.wallet = wallet;
+        return completedTxs;
     }
 }
 
@@ -119,141 +391,6 @@ function findDatumFromHash(
     }
 
     throw new BuildTransactionError('NoDatumFoundForDatumHash', hash);
-}
-
-/**
- * Retrieves the CML Redeemer in a CML Transaction.
- * @param transaction CML Transaction to parse
- * @returns The only redeemer in the transaction
- * @throws NoRedeemerInTransactionError
- * @throws MoreThanOneRedeemerInTransactionError
- */
-function getOnlyRedeemerFromTransaction(
-    transaction: C.Transaction
-): C.Redeemer {
-    const redeemers = transaction.witness_set().redeemers();
-
-    if (!redeemers)
-        throw new BuildTransactionError('NoRedeemerInTransaction.ExpectedOne');
-
-    if (redeemers.len() > 1)
-        throw new BuildTransactionError(
-            'MoreThanOneRedeemerInTransaction.ExpectedJustOne'
-        );
-    return redeemers.get(0);
-}
-
-/**
- * Gets the marlowe contract UTxOs from the inputs inside a list of transactions
- * @param transactions All the CML transactions to parse
- * @returns A list of all marlowe contract UTxOs
- */
-async function getMarloweInputs(
-    transactions: C.Transaction[],
-    lucid: Lucid
-): Promise<UTxO[]> {
-    const utxoRefs = transactions.map((tx) => {
-        const redeemer = getOnlyRedeemerFromTransaction(tx);
-        const inputIndex = redeemer.index();
-        const input = tx.body().inputs().get(Number(inputIndex.to_str()));
-
-        return getRefFromInput(input);
-    });
-
-    return lucid.utxosByOutRef(utxoRefs);
-}
-
-/**
- * Gets the OutRef from a CML TransactionInput
- * @param input The CML TransactionInput to parse
- * @returns the corresponding OutRef
- */
-function getRefFromInput(input: C.TransactionInput): OutRef {
-    const txId = input.transaction_id().to_hex();
-    const idx = Number(input.index().to_str());
-    const ref: OutRef = { txHash: txId, outputIndex: idx };
-    return ref;
-}
-
-async function processCbor(
-    cbor: string,
-    lucid: Lucid,
-    mosEnv: MOSEnv<UTxO>
-): Promise<Tx> {
-    const transaction = C.Transaction.from_bytes(Buffer.from(cbor, 'hex'));
-
-    const allMarloweInputs = await getMarloweInputs([transaction], lucid);
-
-    const newTx = translateToTx(transaction, allMarloweInputs, lucid, mosEnv);
-    newTx.readFrom([mosEnv.marloweValidatorUtxo]);
-
-    return newTx;
-}
-
-/**
- * Translates a CML transaction that is the result of calling
- * applyInputsToContract to a Lucid transaction
- * @param transaction The CML transaction to translate
- * @returns The Lucid transaction
- */
-function translateToTx(
-    transaction: C.Transaction,
-    inputs: UTxO[],
-    lucid: Lucid,
-    mosEnv: MOSEnv<UTxO>
-): Tx {
-    let finalTx: Tx = new Tx(lucid);
-    const utils = new Utils(lucid);
-
-    const redeemer = getOnlyRedeemerFromTransaction(transaction);
-
-    const txInputs = transaction.body().inputs();
-    let validInput: UTxO | undefined = undefined;
-
-    for (let i = 0; i < txInputs.len(); i++) {
-        const input = txInputs.get(i);
-        const ref = getRefFromInput(input);
-
-        if (!validInput) {
-            validInput = inputs.find((utxo) => {
-                return (
-                    utxo.outputIndex === ref.outputIndex &&
-                    utxo.txHash === ref.txHash
-                );
-            });
-        }
-    }
-
-    if (!validInput)
-        throw new BuildTransactionError('NoTransactionInputFoundOnInputsList');
-
-    const redeemerCbor = toHex(redeemer.data().to_bytes());
-    finalTx.collectFrom([validInput], redeemerCbor);
-
-    finalTx.compose(
-        processMarloweOutput(transaction, lucid, mosEnv.marloweValidatorAddress)
-    );
-
-    const slotFrom = transaction.body().validity_start_interval();
-    const slotUntil = transaction.body().ttl();
-
-    const from: number = utils.slotToUnixTime(Number(slotFrom!.to_str()));
-    const until: number = utils.slotToUnixTime(Number(slotUntil!.to_str()));
-
-    finalTx.validFrom(from);
-    finalTx.validTo(until);
-
-    const requiredSigners = transaction.body().required_signers();
-
-    if (requiredSigners) {
-        for (let i = 0; i < requiredSigners?.len(); i++) {
-            const reqSigner = requiredSigners?.get(i);
-            const key = reqSigner.to_hex();
-            finalTx.addSignerKey(key);
-        }
-    }
-
-    return finalTx;
 }
 
 /**
@@ -302,45 +439,6 @@ export function processMarloweOutput(
     }
 
     return finalTx;
-}
-
-/**
- * Balances a list of txs, making sure than the utxos used for balancing don't
- * overlap
- * @param txs transactions to balance
- * @param lucid lucid instance
- * @returns The balanced transactions
- */
-async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
-    const wallet = lucid.wallet;
-    let completedTxs: TxComplete[] = [];
-
-    try {
-        const address = await wallet.address();
-        let utxos = await wallet.getUtxos();
-
-        for (var tx of txs) {
-            const external: ExternalWallet = { address: address, utxos: utxos };
-            lucid.selectWalletFrom(external);
-
-            const completedTx = await tx.complete({ nativeUplc: false });
-            completedTxs.push(completedTx);
-
-            const usedUtxos = completedTx.txComplete.body().inputs();
-            utxos = utxos.filter((utxo) => {
-                const ref: OutRef = {
-                    txHash: utxo.txHash,
-                    outputIndex: utxo.outputIndex,
-                };
-                return !isIncluded(ref, usedUtxos);
-            });
-        }
-    } catch (err) {
-        console.log(err);
-    } finally {
-        lucid.wallet = wallet;
-        return completedTxs;
-    }
 }
 
 /**

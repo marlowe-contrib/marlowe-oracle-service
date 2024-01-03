@@ -25,22 +25,6 @@ function getTimeout(): bigint {
 const contractJson: Contract = {
     when: [
         {
-            then: {
-                when: [
-                    {
-                        then: 'close',
-                        case: {
-                            for_choice: {
-                                choice_owner: { address: choice_owner },
-                                choice_name: 'Coingecko USDADA',
-                            },
-                            choose_between: [{ to: 100000000000n, from: 100n }],
-                        },
-                    },
-                ],
-                timeout_continuation: 'close',
-                timeout: getTimeout(),
-            },
             case: {
                 for_choice: {
                     choice_owner: { address: choice_owner },
@@ -48,10 +32,15 @@ const contractJson: Contract = {
                 },
                 choose_between: [{ to: 100000000000n, from: 100n }],
             },
+            then: {
+                when: [{ case: { notify_if: true }, then: 'close' }],
+                timeout: getTimeout(),
+                timeout_continuation: 'close',
+            },
         },
     ],
-    timeout_continuation: 'close',
     timeout: getTimeout(),
+    timeout_continuation: 'close',
 };
 
 const request: CreateContractRequest = {
