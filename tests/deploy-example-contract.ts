@@ -6,15 +6,36 @@ import { Contract } from '@marlowe.io/language-core-v1';
 import { CreateContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/index';
 import { C, Lucid } from 'lucid-cardano';
 import { processMarloweOutput } from '../src/tx.ts';
+import { Command } from 'commander';
 
 const mosEnv = parseMOSEnv();
 const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
 lucid.selectWalletFromPrivateKey(mosEnv.signingKey);
+let args = '';
+const program = new Command();
+
+program.showHelpAfterError();
+
+program.description('Deploy an example contract')
+
+program.argument(
+    '<address>',
+    'Address for the choice owner',
+    (addr) => {
+        args = addr;
+    }
+);
+
+try {
+    program.parse(process.argv);
+} catch (error) {
+    console.log(error);
+}
 
 const choice_name = 'Coingecko ADAUSD';
-const choice_owner = 'COMPLETE ME';
-const changeAddress: AddressBech32 = addressBech32('COMPLETE ME');
+const choice_owner = args;
+const changeAddress = addressBech32(await lucid.wallet.address());
 
 function getTimeout(): bigint {
     const date = new Date();
@@ -59,6 +80,7 @@ console.log('contractTx: ', contract.tx);
 
 const txCbor = contract.tx.cborHex;
 const transaction = C.Transaction.from_bytes(Buffer.from(txCbor, 'hex'));
+
 
 try {
     const tx = processMarloweOutput(
