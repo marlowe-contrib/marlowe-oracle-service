@@ -129,7 +129,7 @@ async function getAllUtxos(
             const details = await client.getContractById(cId);
             allDetails.set(req, details);
         } catch (e) {
-            console.log('error at getAllUtxos: ', e);
+            txLogger.error(e);
         }
     }
 
@@ -167,7 +167,7 @@ async function getAllUtxos(
             })(detail.utxo)
         );
         if (!foundDetail) {
-            console.log('No contract detail found for ref: ', utxo);
+            txLogger.error('No contract detail found for ref: ', utxo);
         }
     }
 
@@ -209,9 +209,9 @@ async function getApplyRequests(
 
     const applyResponse = await applyInput(applyUrl, newRequest);
     if ('error' in applyResponse) {
-        console.log(applyResponse.error);
+        txLogger.error(applyResponse.error);
     } else if (applyResponse.payments.length > 0) {
-        console.log('Found payments. Ignoring this tx.');
+        txLogger.warn('Found payments. Ignoring this tx.');
     } else {
         newTx = new Tx(lucid);
 
