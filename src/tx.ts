@@ -274,14 +274,8 @@ export async function buildAndSubmit(
                 if (tx) allTxs.push(tx);
             }
 
-            const refScriptRef = {
-                txHash: 'c59678b6892ba0fbeeaaec22d4cbde17026ff614ed47cea02c47752e5853ebc8',
-                outputIndex: 1,
-            };
-            const refScriptUtxo = await lucid.utxosByOutRef([refScriptRef]);
-
             allTxs = allTxs.map((tx) => {
-                return tx.readFrom(refScriptUtxo);
+                return tx.readFrom([mosEnv.marloweValidatorUtxo]);
             });
 
             const completedTxs = await balanceParallel(allTxs, lucid);
