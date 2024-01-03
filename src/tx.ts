@@ -8,9 +8,12 @@ import {
     ExternalWallet,
     Lucid,
     OutRef,
+    OutputData,
     Tx,
     TxComplete,
     UTxO,
+    toHex,
+    valueToAssets,
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
 import { MOSEnv } from './config.ts';
@@ -20,14 +23,15 @@ import {
     throwAxiosError,
 } from './error.ts';
 import { Input, IChoice, Party } from 'marlowe-language-core-v1-txpipe';
+import { Payment } from 'marlowe-language-core-v1-txpipe/dist/esm/transaction.ts';
 import MLC from 'marlowe-language-core-v1-txpipe';
 import { TxOutRef, unTxOutRef } from '@marlowe.io/runtime-core';
 import { match, toUndefined } from 'fp-ts/lib/Option.js';
 import { ContractDetails } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/details';
 import { constUndefined } from 'fp-ts/lib/function.js';
 
-//TODO: Rename
-export type OurApplyRequest = {
+// The request and response types for the Marlowe Apply Service (MAS)
+export type MASRequest = {
     version: string;
     marloweData: Datum;
     invalidBefore: Date;
@@ -35,16 +39,20 @@ export type OurApplyRequest = {
     inputs: Input[];
 };
 
-type SuccessApplyResponse = {
+type MASSuccessResponse = {
     datumCborHex: string;
     redeemerCborHex: string;
+    payments: Payment[];
 };
 
-type ErrorApplyResponse = {
+type MASErrorResponse = {
     error: string;
 };
 
-//TODO: Comment
+export type MASResponse = MASSuccessResponse | MASErrorResponse;
+
+//This function goes over all fields of an object and changes any bigint field
+// to a number. Used for the applyInput function.
 function convertBigIntToNumber(obj: any): any {
     if (typeof obj === 'bigint') {
         return Number(obj);
@@ -58,8 +66,6 @@ function convertBigIntToNumber(obj: any): any {
     return obj;
 }
 
-export type ApplyResponse = SuccessApplyResponse | ErrorApplyResponse;
-
 /**
  * Get the updated datum after doing an apply, using our own service.
  *
@@ -69,8 +75,8 @@ export type ApplyResponse = SuccessApplyResponse | ErrorApplyResponse;
  */
 export async function applyInput(
     applyUrl: string,
-    request: OurApplyRequest
-): Promise<ApplyResponse> {
+    request: MASRequest
+): Promise<MASResponse> {
     const response = await fetch(applyUrl, {
         method: 'POST',
         body: JSON.stringify(convertBigIntToNumber(request)),
@@ -84,12 +90,18 @@ export async function applyInput(
         throw new RequestError(`${response.status}`, response.statusText);
     }
 
-    const result = (await response.json()) as ApplyResponse;
+    const result = (await response.json()) as MASResponse;
 
     return result;
 }
 
-//TODO: Comment
+/**
+ * Given a list of requests, fetches the utxo of the corresponding contract.
+ * @param client Marlowe Rest Client
+ * @param lucid Intance of Luicd initiated with a provider
+ * @param requests List of requests to process
+ * @returns A map matching each request to a UTxO
+ */
 async function getAllUtxos(
     client: RestClient,
     lucid: Lucid,
@@ -147,7 +159,16 @@ async function getAllUtxos(
     return result;
 }
 
-//TODO: Comment
+/**
+ * Uses the Marlowe Apply Service (MAS) to calculate the updated datum and build
+ * the process tx.
+ * @param lucid Lucid instance initiated with a provider
+ * @param applyUrl The url of the MAS
+ * @param utxo The contract utxo
+ * @param request the apply request for that contract
+ * @returns The Tx that applies the request or undefined if it wasn't possible
+ * to do the apply
+ */
 async function getApplyRequests(
     lucid: Lucid,
     applyUrl: string,
@@ -163,7 +184,7 @@ async function getApplyRequests(
     const newIBUNIX = Math.floor(oldIBUNIX / 1000) * 1000;
     const newIB = new Date(newIBUNIX);
 
-    const newRequest: OurApplyRequest = {
+    const newRequest: MASRequest = {
         version: request.version ?? 'v1',
         marloweData: utxo.datum,
         invalidBefore: newIB,
@@ -172,9 +193,10 @@ async function getApplyRequests(
     };
 
     const applyResponse = await applyInput(applyUrl, newRequest);
-
     if ('error' in applyResponse) {
         console.log(applyResponse.error);
+    } else if (applyResponse.payments.length > 0) {
+        console.log('Found payments. Ignoring this tx.');
     } else {
         newTx = new Tx(lucid);
 
@@ -349,6 +371,80 @@ async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
         lucid.wallet = wallet;
         return completedTxs;
     }
+}
+
+/**
+ * Finds a datum inside a transaction that corresponds with the given hash
+ * @param hash hash to look for
+ * @param transaction transaction where to look for the datum
+ * @returns The Datum whose hash is the same as the given hash
+ * @throws NoDatumsInTx
+ * @throws NoDatumMatchesHash
+ */
+function findDatumFromHash(
+    hash: string,
+    transaction: C.Transaction
+): C.PlutusData {
+    const allDatums = transaction.witness_set().plutus_data();
+    if (!allDatums)
+        throw new BuildTransactionError('NoDatumsFoundInTransaction');
+
+    for (let i = 0; i < allDatums.len(); i++) {
+        const datum = allDatums.get(i);
+        if (C.hash_plutus_data(datum).to_hex() === hash) {
+            return datum;
+        }
+    }
+
+    throw new BuildTransactionError('NoDatumFoundForDatumHash', hash);
+}
+
+/**
+ * Given a CML Transaction, create a Lucid Tx that only has the marlowe output.
+ * Fails if there's more than one output at the marlowe address or if the output
+ * doesn't have a datum.
+ * @param transaction CML transaction to process
+ * @param lucid lucid instance
+ * @param marloweAddress Address of the marlowe validator
+ * @returns The Lucid Tx with either one or none outputs
+ * @throws BuildTransactionError
+ */
+export function processMarloweOutput(
+    transaction: C.Transaction,
+    lucid: Lucid,
+    marloweAddress: Address
+): Tx {
+    const outputs = transaction.body().outputs();
+    let finalTx: Tx = new Tx(lucid);
+    let outputsList: C.TransactionOutput[] = [];
+
+    for (let i = 0; i < outputs.len(); i++) {
+        const out = outputs.get(i);
+        if (out.address().to_bech32(undefined) === marloweAddress) {
+            outputsList.push(out);
+        }
+    }
+
+    if (outputsList.length > 1)
+        throw new BuildTransactionError('MoreThanOneMarloweContractOutput');
+
+    if (outputsList.length === 1) {
+        const out = outputsList[0];
+
+        const datumHash = out.datum()?.as_data_hash()?.to_hex();
+
+        if (!datumHash)
+            throw new BuildTransactionError('MarloweOutputWithoutDatum');
+
+        const datum = findDatumFromHash(datumHash, transaction);
+        const datumCBOR = toHex(datum.to_bytes());
+        const assets = valueToAssets(out.amount());
+
+        const outputData: OutputData = { asHash: datumCBOR };
+        finalTx.payToContract(marloweAddress, outputData, assets);
+    }
+
+    return finalTx;
 }
 
 /**

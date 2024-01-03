@@ -28,7 +28,13 @@ const contractJson: Contract = {
             then: {
                 when: [
                     {
-                        then: 'close',
+                        then: {
+                            when: [
+                                { then: 'close', case: { notify_if: true } },
+                            ],
+                            timeout_continuation: 'close',
+                            timeout: getTimeout(),
+                        },
                         case: {
                             for_choice: {
                                 choice_owner: { address: choice_owner },
