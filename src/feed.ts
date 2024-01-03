@@ -1,10 +1,26 @@
 import fetch from 'node-fetch';
-import { addressBech32 } from '@marlowe.io/runtime-core';
-import { ChoiceId, Bound, Input, IChoice } from '@marlowe.io/language-core-v1';
-import { Address } from 'marlowe-language-core-v1-txpipe';
+
+import {
+    AddressBech32,
+    addressBech32,
+    ContractId,
+} from '@marlowe.io/runtime-core';
+import {
+    Address,
+    ChoiceId,
+    Bound,
+    Input,
+    InputContent,
+    IChoice,
+    ChoiceName,
+    ChosenNum,
+} from 'marlowe-language-core-v1-txpipe';
+
 import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
+
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
+import { feedLogger } from './logger.ts';
 
 type Currency = 'ADA' | 'USD';
 
@@ -54,12 +70,24 @@ export async function getApplyInputs(
         if (res.status === 'fulfilled') {
             fulfilled.push(res.value);
         } else {
-            if (res.reason !== 'FeedResultIsOutOfBounds')
-                console.log(res);
+            if (res.reason !== 'FeedResultIsOutOfBounds') {
+                feedLogger.warn(res);
+            }
         }
     });
 
+    feedLogger.info(
+        fulfilled.map((elem) => [elem.contractId, prettyInputs(elem.inputs)])
+    );
+
     return fulfilled;
+}
+
+function prettyInputs(inputs: Input[]): [ChoiceName, ChosenNum][] {
+    return inputs.map((input) => {
+        const ic = input as IChoice;
+        return [ic.for_choice_id.choice_name, ic.input_that_chooses_num];
+    });
 }
 
 /**
@@ -91,7 +119,7 @@ async function feed(
     } catch (e) {
         if (e instanceof FeedError) {
             if (e.name !== 'FeedResultIsOutOfBounds') {
-                console.log(e.name, e.message);
+                feedLogger.error(e.name, e.message);
             }
             return Promise.reject(e.name + e.message);
         } else {

@@ -11,6 +11,7 @@ import { getActiveContracts } from './scan.ts';
 import { getApplyInputs } from './feed.ts';
 import { buildAndSubmit } from './tx.ts';
 import { ConfigError, RequestError } from './error.ts';
+import { mosLogger, configLogger, scanLogger } from './logger.ts';
 
 export async function main() {
     try {
@@ -28,6 +29,9 @@ export async function main() {
 
         const mosEnv = await setMarloweUTxO(rawMosEnv, lucid);
 
+        configLogger.debug(mosConfig);
+        configLogger.debug(mosEnv);
+
         do {
             const activeContracts = await getActiveContracts(
                 client,
@@ -39,27 +43,22 @@ export async function main() {
                 mosConfig.resolveMethod.address.mosAddress,
                 activeContracts
             );
-            console.log(applicableInputs);
-            const txHash = await buildAndSubmit(
-                client,
-                lucid,
-                applicableInputs,
-                mosEnv
-            );
-            console.log('TxHash: ', txHash);
+
+            await buildAndSubmit(client, lucid, applicableInputs, mosEnv);
+
             await new Promise((r) => setTimeout(r, mosConfig.delay));
         } while (true);
     } catch (e) {
         if (e instanceof ConfigError) {
-            console.log(e.name, e.message);
+            mosLogger.error(e.name, e.message);
             return;
         } else if (e instanceof RequestError) {
-            console.log(e.name, e.message);
+            mosLogger.error(e.name, e.message);
             if (e.name == '404') {
                 return;
             }
         } else {
-            console.log(e);
+            mosLogger.error(e);
         }
     }
 }

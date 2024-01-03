@@ -16,12 +16,6 @@ import {
     valueToAssets,
 } from 'lucid-cardano';
 import axios, { AxiosError } from 'axios';
-import { MOSEnv } from './config.ts';
-import {
-    BuildTransactionError,
-    RequestError,
-    throwAxiosError,
-} from './error.ts';
 import { Input, IChoice, Party } from 'marlowe-language-core-v1-txpipe';
 import { Payment } from 'marlowe-language-core-v1-txpipe/dist/esm/transaction.ts';
 import MLC from 'marlowe-language-core-v1-txpipe';
@@ -30,7 +24,17 @@ import { match, toUndefined } from 'fp-ts/lib/Option.js';
 import { ContractDetails } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/details';
 import { constUndefined } from 'fp-ts/lib/function.js';
 
-// The request and response types for the Marlowe Apply Service (MAS)
+import { MOSEnv } from './config.ts';
+import {
+    BuildTransactionError,
+    RequestError,
+    throwAxiosError,
+} from './error.ts';
+import { txLogger } from './logger.ts';
+
+/**
+ * Represents the request structure for the Marlowe Apply Service (MAS).
+ */
 export type MASRequest = {
     version: string;
     marloweData: Datum;
@@ -39,20 +43,31 @@ export type MASRequest = {
     inputs: Input[];
 };
 
+/**
+ * Represents a successful response from the Marlowe Apply Service (MAS).
+ */
 type MASSuccessResponse = {
     datumCborHex: string;
     redeemerCborHex: string;
     payments: Payment[];
 };
 
+/**
+ * Represents an error response from the Marlowe Apply Service (MAS).
+ */
 type MASErrorResponse = {
     error: string;
 };
 
+/**
+ * Represents a response from the Marlowe Apply Service (MAS), which can either
+ * be a success response or an error response.
+ */
 export type MASResponse = MASSuccessResponse | MASErrorResponse;
 
-//This function goes over all fields of an object and changes any bigint field
-// to a number. Used for the applyInput function.
+/** This function goes over all fields of an object and changes any bigint field
+ * to a number. Used for the applyInput function.
+ */
 function convertBigIntToNumber(obj: any): any {
     if (typeof obj === 'bigint') {
         return Number(obj);
@@ -114,7 +129,7 @@ async function getAllUtxos(
             const details = await client.getContractById(cId);
             allDetails.set(req, details);
         } catch (e) {
-            console.log('error at getAllUtxos: ', e);
+            txLogger.error(e);
         }
     }
 
@@ -152,7 +167,7 @@ async function getAllUtxos(
             })(detail.utxo)
         );
         if (!foundDetail) {
-            console.log('No contract detail found for ref: ', utxo);
+            txLogger.error('No contract detail found for ref: ', utxo);
         }
     }
 
@@ -194,9 +209,9 @@ async function getApplyRequests(
 
     const applyResponse = await applyInput(applyUrl, newRequest);
     if ('error' in applyResponse) {
-        console.log(applyResponse.error);
+        txLogger.error(applyResponse.error);
     } else if (applyResponse.payments.length > 0) {
-        console.log('Found payments. Ignoring this tx.');
+        txLogger.warn('Found payments. Ignoring this tx.');
     } else {
         newTx = new Tx(lucid);
 
@@ -254,7 +269,8 @@ export async function buildAndSubmit(
     lucid: Lucid,
     applicableInputs: ApplyInputsToContractRequest[],
     mosEnv: MOSEnv<UTxO>
-): Promise<string[]> {
+): Promise<void> {
+    const submitted: string[] = [];
     if (applicableInputs.length > 0) {
         try {
             const contractUtxos = await getAllUtxos(
@@ -290,29 +306,24 @@ export async function buildAndSubmit(
 
             const psSubmitted = await Promise.allSettled(txHashes);
 
-            const submitted: string[] = [];
-
             psSubmitted.forEach((res, idx) => {
                 if (res.status === 'fulfilled') {
                     submitted.push(res.value);
                 } else {
-                    console.log(res);
+                    txLogger.warn(res);
                 }
             });
-
-            return submitted;
+            txLogger.info(submitted);
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 const e = error as AxiosError;
                 throwAxiosError(e);
             } else if (error instanceof BuildTransactionError) {
-                console.log(error.name, error.message);
+                txLogger.error('Unexpected error occurred', error);
             }
-            console.log('UnknownError: ', error);
-            return ['Error occurred'];
         }
     } else {
-        return ['No inputs to apply'];
+        txLogger.info(submitted);
     }
 }
 
@@ -347,7 +358,7 @@ async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
             const external: ExternalWallet = { address: address, utxos: utxos };
             lucid.selectWalletFrom(external);
 
-            const completedTx = await tx.complete({ nativeUplc: false });
+            const completedTx = await tx.complete({ nativeUplc: true });
             completedTxs.push(completedTx);
 
             const usedUtxos = completedTx.txComplete.body().inputs();
@@ -360,7 +371,7 @@ async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
             });
         }
     } catch (err) {
-        console.log(err);
+        txLogger.error(err);
     } finally {
         lucid.wallet = wallet;
         return completedTxs;

@@ -79,7 +79,7 @@ try {
     console.log('Signed contractTx: ', signed);
 
     await client.submitContract(contract.contractId, signed);
-    console.log('Submitted');
+    console.log('Tx hash: ' + finalTx.toHash());
 } catch (error) {
     console.log(error);
     throw new Error('Submition failed');

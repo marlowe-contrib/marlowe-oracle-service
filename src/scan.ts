@@ -19,12 +19,13 @@ import { Option, isSome, none, toUndefined } from 'fp-ts/lib/Option.js';
 import { pipe } from 'fp-ts/lib/function.js';
 import { isRight, left, match, right } from 'fp-ts/lib/Either.js';
 import { CanChoose } from '@marlowe.io/language-core-v1/dist/esm/next/applicables/canChoose';
+import { scanLogger } from './logger.ts';
 
 import axios, { AxiosError } from 'axios';
 import { RequestError, ScanError, throwAxiosError } from './error.ts';
 
 /**
- * The OracleRequest type contains the necessary information to identify an
+ * The t type contains the necessary information to identify an
  * IChoice action that needs to be resolved.
  */
 export type OracleRequest = {
@@ -98,7 +99,7 @@ export async function getActiveContracts(
             if (e.name == '404') {
                 throw new RequestError('404', e.message);
             } else {
-                console.log(e.name, e.message, e.extra);
+                scanLogger.error(e.name, e.message, e.extra);
             }
         } else {
             throw new ScanError('UnknownError');
@@ -156,6 +157,9 @@ export async function getActiveContracts(
     );
 
     const allNextAction = await Promise.all(promises);
+    const contracts = allNextAction.filter(isRight).map((elem) => elem.right);
 
-    return allNextAction.filter(isRight).map((elem) => elem.right);
+    scanLogger.info(contracts.map((elem) => elem.contractId));
+
+    return contracts;
 }
