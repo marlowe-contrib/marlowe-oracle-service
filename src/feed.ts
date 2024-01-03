@@ -54,7 +54,8 @@ export async function getApplyInputs(
         if (res.status === 'fulfilled') {
             fulfilled.push(res.value);
         } else {
-            console.log(res);
+            if (res.reason !== 'FeedResultIsOutOfBounds')
+                console.log(res);
         }
     });
 
@@ -89,7 +90,9 @@ async function feed(
         }
     } catch (e) {
         if (e instanceof FeedError) {
-            console.log(e.name, e.message);
+            if (e.name !== 'FeedResultIsOutOfBounds') {
+                console.log(e.name, e.message);
+            }
             return Promise.reject(e.name + e.message);
         } else {
             return Promise.reject(e);
