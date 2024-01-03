@@ -34,9 +34,10 @@ type ConfigErrorNames =
     | 'UnknownNetwork'
     | 'ErrorFetchingOrParsingJSON'
     | 'UTxONotFound'
-    | 'ScriptRefNotFoundInUTx0'
+    | 'ScriptRefNotFoundInUTxO'
     | 'CalculatedValidatorAddressDoesNotMatchGivenOne'
-    | 'NoResolveMethodDefined';
+    | 'NoResolveMethodDefined'
+    | 'InvalidUTxORefForMarloweValidator';
 
 /**
  *  Errors from the scan module.

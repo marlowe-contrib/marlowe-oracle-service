@@ -4,19 +4,17 @@ import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
 import { AddressBech32, addressBech32 } from '@marlowe.io/runtime-core';
 import { Contract } from '@marlowe.io/language-core-v1';
 import { CreateContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/index';
-import { Address, C, Lucid } from 'lucid-cardano';
+import { C, Lucid } from 'lucid-cardano';
 import { processMarloweOutput } from '../src/tx.ts';
 
 const mosEnv = parseMOSEnv();
 const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
-lucid.selectWalletFromPrivateKey('COMPLETE ME');
+lucid.selectWalletFromPrivateKey(mosEnv.signingKey);
 
 const choice_name = 'Coingecko ADAUSD';
 const choice_owner = 'COMPLETE ME';
 const changeAddress: AddressBech32 = addressBech32('COMPLETE ME');
-const marloweAddress: Address =
-    'addr_test1wrv9l2du900ajl27hk79u07xda68vgfugrppkua5zftlp8g0l9djk';
 
 function getTimeout(): bigint {
     const date = new Date();
@@ -74,7 +72,11 @@ const txCbor = contract.tx.cborHex;
 const transaction = C.Transaction.from_bytes(Buffer.from(txCbor, 'hex'));
 
 try {
-    const tx = processMarloweOutput(transaction, lucid, marloweAddress);
+    const tx = processMarloweOutput(
+        transaction,
+        lucid,
+        mosEnv.marloweValidatorAddress
+    );
     const balancedTx = await tx.complete();
     const signedTx = balancedTx.sign();
     const finalTx = await signedTx.complete();

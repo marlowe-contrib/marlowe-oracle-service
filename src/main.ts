@@ -1,8 +1,12 @@
-import { Lucid, MaestroConfig, UTxO } from 'lucid-cardano';
+import { Lucid, MaestroConfig } from 'lucid-cardano';
 import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
-import { Address } from 'marlowe-language-core-v1-txpipe';
 
-import { parseMOSConfig, parseMOSEnv, setOracleConfig } from './config.ts';
+import {
+    parseMOSConfig,
+    parseMOSEnv,
+    setOracleConfig,
+    setMarloweUTxO,
+} from './config.ts';
 import { getActiveContracts } from './scan.ts';
 import { getApplyInputs } from './feed.ts';
 import { buildAndSubmit } from './tx.ts';
@@ -10,17 +14,19 @@ import { ConfigError, RequestError } from './error.ts';
 
 export async function main() {
     try {
-        const mc = await parseMOSConfig();
-        const mosEnv = parseMOSEnv();
+        const rawMosConfig = await parseMOSConfig();
+        const rawMosEnv = parseMOSEnv();
 
-        const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
-        lucid.selectWalletFromPrivateKey('COMPLETE ME');
-        const client = mkRestClient(mosEnv.marloweRuntimeUrl);
+        const lucid = await Lucid.new(rawMosEnv.provider, rawMosEnv.network);
+        lucid.selectWalletFromPrivateKey(rawMosEnv.signingKey);
+        const client = mkRestClient(rawMosEnv.marloweRuntimeUrl);
 
-        const mosConfig = await setOracleConfig(mc, lucid);
+        const mosConfig = await setOracleConfig(rawMosConfig, lucid);
 
         if (!mosConfig.resolveMethod.address)
             throw new Error('NoAddressConfig');
+
+        const mosEnv = await setMarloweUTxO(rawMosEnv, lucid);
 
         do {
             const activeContracts = await getActiveContracts(
@@ -37,7 +43,8 @@ export async function main() {
             const txHash = await buildAndSubmit(
                 client,
                 lucid,
-                applicableInputs
+                applicableInputs,
+                mosEnv
             );
             console.log('TxHash: ', txHash);
             await new Promise((r) => setTimeout(r, mosConfig.delay));
@@ -51,6 +58,8 @@ export async function main() {
             if (e.name == '404') {
                 return;
             }
+        } else {
+            console.log(e);
         }
     }
 }

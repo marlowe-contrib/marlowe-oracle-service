@@ -10,8 +10,10 @@ The MOS service requires specific environment variables and a configuration file
 
 ```shell
 export MARLOWE_RUNTIME_URL='COMPLETE ME'
-export SIGN_TX_URL='COMPLETE ME'
 export NETWORK='Preprod'
+export SIGNING_KEY='COMPLETE ME'
+export MARLOWE_VALIDATOR_ADDRESS='COMPLETE ME'
+export MARLOWE_VALIDATOR_UTXO_REF='COMPLETE ME'
 ```
 
 Besides, we need to include the token or key corresponding to the provider we want to use. Currently, MOS supports Maestro and Blockfrost. We must include one (and only one) of the following environment variables:
@@ -26,10 +28,14 @@ The other part of the configuration it's done in the [mos-config.json](./mos-con
 ```json
 {
   "delay": 30000,
-  "resolveMethod": "Address",
-  "choiceNames": [
-    "Coingecko ADAUSD"
-  ]
+  "resolveMethod": {
+    "address" :  {
+      "mosAddress": {
+        "address": "addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9"
+      },
+      "choiceNames":[ "Coingecko ADAUSD" ]
+      }
+  }
 }
 ```
 
@@ -38,7 +44,7 @@ We specify the waiting time of each iteration in milliseconds, the choice resolu
 Use the following commands to install all the dependencies and then run the service:
 ```bash
     $ npm install
-    $ npm run dev -- mos-config.json 
+    $ npm run dev -- mos-config.json
 ```
 
 
@@ -55,10 +61,3 @@ const choice_owner = "this should be the oracle services address";
 const changeAddress: AddressBech32 = addressBech32("your_address");
 ```
 
-We also need to have the `sign-tx` service. To install and run it, go to https://github.com/filabs-dev/sign-tx.
-
-After everything is configured, we can use the following command to run the script.
-```bash
-    $ npm install
-    $ npm run deploy-example
-```
