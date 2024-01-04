@@ -64,7 +64,7 @@ The choice owner should be the oracle service's address, and the choice name the
         "choice_name": "Coingecko ADAUSD"
     },
     "choose_between": [
-        { "from": 100, "to":10000000}
+        { "from": 100, "to":100000000000}
     ]
   }
 ```
