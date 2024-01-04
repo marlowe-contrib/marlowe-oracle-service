@@ -1,31 +1,34 @@
 import { parseMOSEnv } from '../src/config.ts';
+import { processMarloweOutput } from '../src/tx.ts';
 
 import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
-import { AddressBech32, addressBech32 } from '@marlowe.io/runtime-core';
+import { addressBech32 } from '@marlowe.io/runtime-core';
 import { Contract } from '@marlowe.io/language-core-v1';
 import { CreateContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/index';
+import { Choice } from 'marlowe-language-core-v1-txpipe';
+
 import { C, Lucid } from 'lucid-cardano';
-import { processMarloweOutput } from '../src/tx.ts';
+
 import { Command } from 'commander';
+import { readFileSync } from 'fs';
 
 const mosEnv = parseMOSEnv();
 const client = mkRestClient(mosEnv.marloweRuntimeUrl);
 const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
 lucid.selectWalletFromPrivateKey(mosEnv.signingKey);
+
 let args = '';
 const program = new Command();
-
-program.showHelpAfterError();
-
-program.description('Deploy an example contract')
-
-program.argument(
-    '<address>',
-    'Address for the choice owner',
-    (addr) => {
-        args = addr;
-    }
-);
+program
+    .showHelpAfterError()
+    .description('Deploy an example contract')
+    .argument(
+    '<filepath>',
+    'Complete choice for the contract',
+        (fp) => {
+            args = fp;
+        }
+    );
 
 try {
     program.parse(process.argv);
@@ -33,8 +36,8 @@ try {
     console.log(error);
 }
 
-const choice_name = 'Coingecko ADAUSD';
-const choice_owner = args;
+const choice: Choice = fromFileChoice(args);
+
 const changeAddress = addressBech32(await lucid.wallet.address());
 
 function getTimeout(): bigint {
@@ -46,13 +49,7 @@ function getTimeout(): bigint {
 const contractJson: Contract = {
     when: [
         {
-            case: {
-                for_choice: {
-                    choice_owner: { address: choice_owner },
-                    choice_name: choice_name,
-                },
-                choose_between: [{ to: 100000000000n, from: 100n }],
-            },
+            case: choice,
             then: {
                 when: [{ case: { notify_if: true }, then: 'close' }],
                 timeout: getTimeout(),
@@ -81,7 +78,6 @@ console.log('contractTx: ', contract.tx);
 const txCbor = contract.tx.cborHex;
 const transaction = C.Transaction.from_bytes(Buffer.from(txCbor, 'hex'));
 
-
 try {
     const tx = processMarloweOutput(
         transaction,
@@ -105,4 +101,11 @@ try {
 } catch (error) {
     console.log(error);
     throw new Error('Submition failed');
+}
+
+function fromFileChoice(filepath: string): Choice {
+    const fileContent = readFileSync(filepath, 'utf-8');
+    const json = JSON.parse(fileContent);
+    const parsedData = json as Choice;
+    return parsedData;
 }

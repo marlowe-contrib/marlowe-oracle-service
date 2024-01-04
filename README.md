@@ -14,6 +14,8 @@ export NETWORK='Preprod'
 export SIGNING_KEY='COMPLETE ME'
 export MARLOWE_VALIDATOR_ADDRESS='COMPLETE ME'
 export MARLOWE_VALIDATOR_UTXO_REF='COMPLETE ME'
+export APPLY_URL='COMPLETE ME'
+
 ```
 
 Besides, we need to include the token or key corresponding to the provider we want to use. Currently, MOS supports Maestro and Blockfrost. We must include one (and only one) of the following environment variables:
@@ -50,14 +52,20 @@ Use the following commands to install all the dependencies and then run the serv
 
 ## Deploy a contract
 
-There is a utility that allows to submit a simple Marlowe contract that expects a Choice input and then closes.
-To use it, we have to set up a few things:
-First, we have to set up some things in the `test/deploy-example-contract.ts` file, that can be found like the following:
- ```typescript
-// oracle service address
-const choice_owner = "this should be the oracle services address";
-
-// This is going to be the changeAddress for the request
-const changeAddress: AddressBech32 = addressBech32("your_address");
+There is a utility that allows to submit a simple Marlowe contract that expects a Choice input, expects a notification and then closes.
+To use it, we have to set up the environment variables, and configure the file [choice-info.json](./tests/choice-info.json) that can be found in the `tests` folder. It contains the Choice that will be featured in the contract.
+The choice owner should be the oracle service's address, and the choice name the desired source and currency pair. Here is an example of a possible configuration:
+```json
+  {
+    "for_choice": {
+        "choice_owner": {
+            "address": "addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9"
+        },
+        "choice_name": "Coingecko ADAUSD"
+    },
+    "choose_between": [
+        { "from": 100, "to":10000000}
+    ]
+  }
 ```
 
