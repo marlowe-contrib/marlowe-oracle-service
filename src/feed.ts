@@ -21,6 +21,9 @@ import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
 import { feedLogger } from './logger.ts';
+import { Data, Lucid, UTxO, Utils } from 'lucid-cardano';
+import { MOSConfig, OracleConfig, ResolveMethod } from './config.ts';
+import { Option, none, some } from 'fp-ts/lib/Option.js';
 
 type Currency = 'ADA' | 'USD';
 
@@ -36,6 +39,7 @@ type CurrencyPair = {
 const KnownCurrencyPairs = new Map([
     ['Coingecko ADAUSD', { source: 'Coingecko', from: 'ADA', to: 'USD' }],
     ['Coingecko USDADA', { source: 'Coingecko', from: 'USD', to: 'ADA' }],
+    ['Charli3 ADAUSD', { source: 'Charli3', from: 'USD', to: 'ADA' }],
 ]);
 
 /**
@@ -45,16 +49,21 @@ const KnownCurrencyPairs = new Map([
  * @returns A list of apply inputs, ready to be used on the applyInputsToContract endpoint.
  */
 export async function getApplyInputs(
-    mosAddress: Address,
-    requests: OracleRequest[]
+    requests: OracleRequest[],
+    resMethods: ResolveMethod<UTxO>,
+    lucid: Lucid
 ): Promise<ApplyInputsToContractRequest[]> {
-    const priceMap = await setPriceMap(requests);
+    const priceMap = await setPriceMap(requests, resMethods, lucid);
+
+    if (!resMethods.address) throw new Error('No Address set');
+    if (!resMethods.address.mosAddress) throw new Error('No Address set');
+    const mosAddress = resMethods.address.mosAddress.address
 
     const feeds = requests.map(async (request) => {
         const input = await feed(request, priceMap);
         const air: ApplyInputsToContractRequest = {
             contractId: request.contractId,
-            changeAddress: addressBech32(mosAddress.address),
+            changeAddress: addressBech32(mosAddress), // this probably needs to change for charli3 case
             inputs: [input],
             metadata: {},
             invalidBefore: request.invalidBefore,
@@ -99,7 +108,7 @@ function prettyInputs(inputs: Input[]): [ChoiceName, ChosenNum][] {
  */
 async function feed(
     request: OracleRequest,
-    priceMap: Record<string, bigint>
+    priceMap: PriceMap
 ): Promise<Input> {
     try {
         const cn = request.choiceId.choice_name;
@@ -110,8 +119,8 @@ async function feed(
 
         if (!price) throw new FeedError('PriceUndefinedForChoiceName', cn);
 
-        if (withinBounds(price, request.choiceBounds)) {
-            const input: Input = makeInput(request.choiceId, price);
+        if (withinBounds(price[0], request.choiceBounds)) {
+            const input: Input = makeInput(request.choiceId, price[0]);
             return input;
         } else {
             throw new FeedError('FeedResultIsOutOfBounds');
@@ -236,6 +245,8 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
     return inputChoice;
 }
 
+type PriceMap = Record<string, [bigint, Option<UTxO>]>
+
 /**
  * Queries and creates a map that stores the price for every ChoiceName, to
  * avoid having to query the source multiple times for the same choice names.
@@ -243,26 +254,55 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
  * @returns Record containing the price for each ChoiceName
  */
 async function setPriceMap(
-    requests: OracleRequest[]
-): Promise<Record<string, bigint>> {
+    requests: OracleRequest[],
+    resMethods: ResolveMethod<UTxO>,
+    lucid: Lucid
+): Promise<PriceMap> {
     let requestedCN: Set<string> = new Set();
     requests.map((req) => {
         requestedCN.add(req.choiceId.choice_name);
     });
 
-    let priceMap: Record<string, bigint> = {};
+    let priceMap: PriceMap= {};
     for (const cn of requestedCN) {
         const curPair = KnownCurrencyPairs.get(cn);
         if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource');
 
-        let price = 0n;
+        let [price, utxo]: [bigint, Option<UTxO>] = [0n, none];
         switch (curPair.source) {
             case 'Coingecko':
                 price = await getCoingeckoPrice(curPair as CurrencyPair);
                 break;
+            case 'Charli3':
+                if (!resMethods.charli3) throw new Error('No charli3 config');
+
+                [price, utxo] = await getCharli3Price(
+                    curPair as CurrencyPair,
+                    resMethods.charli3,
+                    lucid
+                );
+                break;
         }
-        priceMap[cn] = price;
+        priceMap[cn] = [price, none];
     }
 
     return priceMap;
+}
+
+async function getCharli3Price(
+    curPair: CurrencyPair,
+    c3Config: OracleConfig<UTxO>,
+    lucid: Lucid
+): Promise<[bigint, Option<UTxO>]> {
+    const charli3Utxo = await lucid.utxosAt(c3Config.feedAddress);
+
+    const feedUtxo = charli3Utxo.filter((utxo) =>
+        utxo.assets[c3Config.feedAssetClass] === 1n
+    );
+
+    if (!feedUtxo[0]) throw new Error('UtxoWOracleFeedNotFound');
+    if (!feedUtxo[0].datum) throw new Error('UtxoWOracleFeedDoesNotHaveDatum');
+
+    console.log(feedUtxo[0].datum)
+    return [0n, some(feedUtxo[0])];
 }
