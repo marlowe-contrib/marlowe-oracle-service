@@ -29,7 +29,7 @@ import { configLogger } from './logger.ts';
  * - the address of the decentralized oracle's feed
  * - the asset class of the token that identifies the dec oracle feed UTx0.
  */
-type OracleConfig<T> = {
+export type OracleConfig<T> = {
     choiceNames: ChoiceName;
     roleNames: string;
     bridgeUtxo: T;
@@ -50,7 +50,7 @@ type AddressConfig = {
 /**
  * Structure for configuration of the different resolve methods.
  */
-type ResolveMethod<T> = {
+export type ResolveMethod<T> = {
     address: AddressConfig | undefined;
     charli3: OracleConfig<T> | undefined;
 };
@@ -59,7 +59,7 @@ type ResolveMethod<T> = {
  * Configuration structure for the Marlowe Oracle Service.
  * Specifies delay (milliseconds) and resolution methods.
  */
-type MOSConfig<T> = {
+export type MOSConfig<T> = {
     delay: number;
     resolveMethod: ResolveMethod<T>;
 };
