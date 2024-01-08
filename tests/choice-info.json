@@ -1,0 +1,11 @@
+{
+    "for_choice": {
+        "choice_owner": {
+            "address": "addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9"
+        },
+        "choice_name": "Coingecko ADAUSD"
+    },
+    "choose_between": [
+        { "from": 100, "to":100000000000}
+    ]
+}
