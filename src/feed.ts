@@ -2,27 +2,23 @@ import fetch from 'node-fetch';
 
 import {
     AddressBech32,
-    addressBech32,
     ContractId,
+    addressBech32,
 } from '@marlowe.io/runtime-core';
 import {
-    Address,
     ChoiceId,
     Bound,
     Input,
-    InputContent,
     IChoice,
     ChoiceName,
     ChosenNum,
 } from 'marlowe-language-core-v1-txpipe';
 
-import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
-
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
 import { feedLogger } from './logger.ts';
-import { Data, Lucid, UTxO, Utils } from 'lucid-cardano';
-import { MOSConfig, OracleConfig, ResolveMethod } from './config.ts';
+import { Lucid, UTxO } from 'lucid-cardano';
+import { OracleConfig, ResolveMethod } from './config.ts';
 import { Option, none, some } from 'fp-ts/lib/Option.js';
 
 type Currency = 'ADA' | 'USD';
@@ -33,6 +29,15 @@ type CurrencyPair = {
     to: Currency;
 };
 
+export type ApplyInputsToContractRequest = {
+    contractId: ContractId,
+    changeAddress: AddressBech32,
+    inputs: Input[],
+    invalidBefore: Date,
+    invalidHereafter: Date
+    // bridgeUTxO: Option<UTxO>,
+    oracleUTxO: Option<UTxO>
+}
 /**
  * @description Currency pairs for which information can be provided by the respective sources
  */
@@ -55,19 +60,21 @@ export async function getApplyInputs(
 ): Promise<ApplyInputsToContractRequest[]> {
     const priceMap = await setPriceMap(requests, resMethods, lucid);
 
-    if (!resMethods.address) throw new Error('No Address set');
-    if (!resMethods.address.mosAddress) throw new Error('No Address set');
-    const mosAddress = resMethods.address.mosAddress.address
+    if (!resMethods.address || !resMethods.address.mosAddress)
+        throw new Error('No Address set');
 
+    const mosAddress = resMethods.address.mosAddress.address;
     const feeds = requests.map(async (request) => {
-        const input = await feed(request, priceMap);
+        const [input, utxo] = await feed(request, priceMap);
         const air: ApplyInputsToContractRequest = {
             contractId: request.contractId,
-            changeAddress: addressBech32(mosAddress), // this probably needs to change for charli3 case
+            changeAddress: addressBech32(mosAddress),
             inputs: [input],
-            metadata: {},
             invalidBefore: request.invalidBefore,
             invalidHereafter: request.invalidHereafter,
+            // bridgeUTxO: request.bridgeUTxO,
+            oracleUTxO: utxo
+
         };
         return air;
     });
@@ -109,19 +116,20 @@ function prettyInputs(inputs: Input[]): [ChoiceName, ChosenNum][] {
 async function feed(
     request: OracleRequest,
     priceMap: PriceMap
-): Promise<Input> {
+): Promise<[Input, Option<UTxO>]> {
     try {
         const cn = request.choiceId.choice_name;
         const curPair = KnownCurrencyPairs.get(cn);
         if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource', cn);
 
-        const price = priceMap[cn];
+        const [price, utxo] = priceMap[cn];
 
-        if (!price) throw new FeedError('PriceUndefinedForChoiceName', cn);
+        if (!(price || utxo))
+            throw new FeedError('PriceUndefinedForChoiceName', cn);
 
-        if (withinBounds(price[0], request.choiceBounds)) {
-            const input: Input = makeInput(request.choiceId, price[0]);
-            return input;
+        if (withinBounds(price, request.choiceBounds)) {
+            const input: Input = makeInput(request.choiceId, price);
+            return [input, utxo];
         } else {
             throw new FeedError('FeedResultIsOutOfBounds');
         }
@@ -283,7 +291,7 @@ async function setPriceMap(
                 );
                 break;
         }
-        priceMap[cn] = [price, none];
+        priceMap[cn] = [price, utxo]
     }
 
     return priceMap;
@@ -303,6 +311,12 @@ async function getCharli3Price(
     if (!feedUtxo[0]) throw new Error('UtxoWOracleFeedNotFound');
     if (!feedUtxo[0].datum) throw new Error('UtxoWOracleFeedDoesNotHaveDatum');
 
-    console.log(feedUtxo[0].datum)
-    return [0n, some(feedUtxo[0])];
+    const price: bigint = parseDatum(feedUtxo[0].datum);
+
+    return [price, some(feedUtxo[0])];
 }
+
+function parseDatum(datum: string): bigint {
+    return 0n;
+}
+
