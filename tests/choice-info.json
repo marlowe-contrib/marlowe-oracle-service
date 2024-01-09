@@ -5,7 +5,5 @@
         },
         "choice_name": "Coingecko ADAUSD"
     },
-    "choose_between": [
-        { "from": 100, "to":100000000000}
-    ]
+    "choose_between": [{ "from": 100, "to": 100000000000 }]
 }

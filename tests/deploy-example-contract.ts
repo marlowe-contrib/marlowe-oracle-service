@@ -22,13 +22,9 @@ const program = new Command();
 program
     .showHelpAfterError()
     .description('Deploy an example contract')
-    .argument(
-    '<filepath>',
-    'Complete choice for the contract',
-        (fp) => {
-            args = fp;
-        }
-    );
+    .argument('<filepath>', 'Complete choice for the contract', (fp) => {
+        args = fp;
+    });
 
 try {
     program.parse(process.argv);
