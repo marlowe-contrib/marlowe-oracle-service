@@ -85,11 +85,9 @@ async function getAllContracts(
 export async function getActiveContracts(
     client: RestClient,
     lucid: Lucid,
-    methods: ResolveMethod<any>
+    methods: ResolveMethod<any>,
+    tags: string[]
 ): Promise<OracleRequest[]> {
-    let tags: string[] = methods.address?.tags ?? [];
-    tags = tags.concat(methods.charli3?.tags ?? []);
-
     const contractsRequest: GetContractsRequest = {
         tags: tags,
     };

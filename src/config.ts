@@ -36,7 +36,6 @@ export type OracleConfig<T> = {
     bridgeAddress: string;
     feedAddress: string;
     feedAssetClass: Unit;
-    tags: string[];
 };
 
 /**
@@ -46,7 +45,6 @@ export type OracleConfig<T> = {
 export type AddressConfig = {
     mosAddress: Address;
     choiceNames: ChoiceName[];
-    tags: string[];
 };
 
 /**
@@ -63,6 +61,7 @@ export type ResolveMethod<T> = {
  */
 type MOSConfig<T> = {
     delay: number;
+    tags: string[];
     resolveMethod: ResolveMethod<T>;
 };
 
