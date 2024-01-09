@@ -1,8 +1,5 @@
 import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
-import {
-    ContractId,
-    unPolicyId,
-} from '@marlowe.io/runtime-core';
+import { ContractId, unPolicyId } from '@marlowe.io/runtime-core';
 import {
     Bound,
     ChoiceId,
@@ -90,7 +87,6 @@ export async function getActiveContracts(
     lucid: Lucid,
     methods: ResolveMethod<any>
 ): Promise<OracleRequest[]> {
-
     let tags: string[] = methods.address?.tags ?? [];
     tags = tags.concat(methods.charli3?.tags ?? []);
 
@@ -178,7 +174,6 @@ export async function getActiveContracts(
             const roleMintingPolicy = unPolicyId(
                 contract.roleTokenMintingPolicyId
             );
-            if (roleMintingPolicy === '') continue;
 
             const assetClass =
                 roleMintingPolicy +
@@ -188,17 +183,22 @@ export async function getActiveContracts(
                 (utxo) => utxo.assets[assetClass] === 1n
             );
 
-            if (!utxo) continue;
-
-            const newRequest: OracleRequest = {
-                contractId: contract.contractId,
-                choiceId: choice.for_choice,
-                choiceBounds: choice.can_choose_between,
-                invalidBefore: timeBefore5Minutes,
-                invalidHereafter: timeAfter5Minutes,
-                bridgeUtxo: some(utxo),
-            };
-            charli3Resolvable.push(newRequest);
+            if (!utxo) {
+                scanLogger.debug(
+                    'No Bridge UTxO found for contract:',
+                    contract.contractId
+                );
+            } else {
+                const newRequest: OracleRequest = {
+                    contractId: contract.contractId,
+                    choiceId: choice.for_choice,
+                    choiceBounds: choice.can_choose_between,
+                    invalidBefore: timeBefore5Minutes,
+                    invalidHereafter: timeAfter5Minutes,
+                    bridgeUtxo: some(utxo),
+                };
+                charli3Resolvable.push(newRequest);
+            }
         }
     }
 
