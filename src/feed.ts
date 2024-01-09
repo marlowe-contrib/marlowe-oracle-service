@@ -17,7 +17,7 @@ import {
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
 import { feedLogger } from './logger.ts';
-import { Lucid, UTxO } from 'lucid-cardano';
+import { Constr, Data, Datum, Lucid, UTxO } from 'lucid-cardano';
 import { OracleConfig, ResolveMethod } from './config.ts';
 import { Option, none, some } from 'fp-ts/lib/Option.js';
 
@@ -308,15 +308,35 @@ async function getCharli3Price(
         utxo.assets[c3Config.feedAssetClass] === 1n
     );
 
-    if (!feedUtxo[0]) throw new Error('UtxoWOracleFeedNotFound');
-    if (!feedUtxo[0].datum) throw new Error('UtxoWOracleFeedDoesNotHaveDatum');
+    if (!feedUtxo[0]) throw new FeedError('UtxoWOracleFeedNotFound');
+    if (!feedUtxo[0].datum) throw new FeedError('UtxoWOracleFeedDoesNotHaveDatum');
 
-    const price: bigint = parseDatum(feedUtxo[0].datum);
+    const price: bigint = parseCharli3Price(feedUtxo[0].datum);
 
     return [price, some(feedUtxo[0])];
 }
 
-function parseDatum(datum: string): bigint {
-    return 0n;
+function parseCharli3Price(datum : Datum) : bigint {
+    const date = new Date();
+    let data = Data.from<Data>(datum);
+    if (data instanceof Constr && data.index === 0) {
+        let data2 = data.fields[0];
+        if (data2 instanceof Constr && data2.index === 2) {
+            let data3 = data2.fields[0];
+            if (data3 instanceof Map) {
+                if (data3.get(BigInt(2)) as bigint < date.getTime()){
+                    return data3.get(BigInt(0)) as bigint;
+                } else {
+                    throw new FeedError('Charli3PriceExpired');
+                }
+            }else {
+                throw new FeedError('UnexpectedCharli3DatumShape');
+            }
+        } else {
+            throw new FeedError('UnexpectedCharli3DatumShape');
+        }
+    } else {
+        throw new FeedError('UnexpectedCharli3DatumShape');
+    }
 }
 
