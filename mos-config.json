@@ -5,7 +5,8 @@
       "mosAddress": {
         "address": "addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9"
       },
-      "choiceNames":[ "Coingecko ADAUSD" ]
+      "choiceNames":[ "Coingecko ADAUSD" ],
+      "tags": ["coingecko.oracle.test"]
       },
     "charli3" : {
       "choiceNames": "Charli3 ADAUSD",
@@ -16,7 +17,8 @@
       },
       "bridgeAddress": "addr_test1wpw0vwcfs7ga442vnp4skf8ecezauv3x5lxt6u0avnez2xqj4qkwc",
       "feedAddress": "addr_test1wzn5ee2qaqvly3hx7e0nk3vhm240n5muq3plhjcnvx9ppjgf62u6a",
-      "feedAssetClass": "1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf074f7261636c6546656564"
+      "feedAssetClass": "1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf074f7261636c6546656564",
+      "tags": ["charli3.oracle.test"]
     }
   }
 }

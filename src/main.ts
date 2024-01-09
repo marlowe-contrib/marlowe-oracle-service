@@ -35,8 +35,8 @@ export async function main() {
         do {
             const activeContracts = await getActiveContracts(
                 client,
-                mosConfig.resolveMethod.address.mosAddress,
-                mosConfig.resolveMethod.address.choiceNames
+                lucid,
+                mosConfig.resolveMethod
             );
 
             const applicableInputs = await getApplyInputs(

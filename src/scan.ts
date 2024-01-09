@@ -1,12 +1,14 @@
 import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
-import { ContractId, addressBech32 } from '@marlowe.io/runtime-core';
 import {
-    Address,
+    ContractId,
+    unPolicyId,
+} from '@marlowe.io/runtime-core';
+import {
     Bound,
     ChoiceId,
-    ChoiceName,
     mkEnvironment,
     Next,
+    Party,
     partyCmp,
 } from 'marlowe-language-core-v1-txpipe';
 
@@ -15,14 +17,16 @@ import {
     ContractsRange,
     GetContractsRequest,
 } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract';
-import { Option, isSome, none, toUndefined } from 'fp-ts/lib/Option.js';
+import { Option, isSome, none, some, toUndefined } from 'fp-ts/lib/Option.js';
 import { pipe } from 'fp-ts/lib/function.js';
-import { isRight, left, match, right } from 'fp-ts/lib/Either.js';
+import { left, match } from 'fp-ts/lib/Either.js';
 import { CanChoose } from '@marlowe.io/language-core-v1/dist/esm/next/applicables/canChoose';
 import { scanLogger } from './logger.ts';
 
 import axios, { AxiosError } from 'axios';
 import { RequestError, ScanError, throwAxiosError } from './error.ts';
+import { Lucid, UTxO } from 'lucid-cardano';
+import { ResolveMethod } from './config.ts';
 
 /**
  * The t type contains the necessary information to identify an
@@ -34,6 +38,7 @@ export type OracleRequest = {
     choiceBounds: Bound[];
     invalidBefore: Date;
     invalidHereafter: Date;
+    bridgeUtxo: Option<UTxO>;
 };
 
 /**
@@ -82,18 +87,20 @@ async function getAllContracts(
  */
 export async function getActiveContracts(
     client: RestClient,
-    mosAddress: Address,
-    validChoiceNames: ChoiceName[]
+    lucid: Lucid,
+    methods: ResolveMethod<any>
 ): Promise<OracleRequest[]> {
-    const b32OracleAddr = addressBech32(mosAddress.address);
+
+    let tags: string[] = methods.address?.tags ?? [];
+    tags = tags.concat(methods.charli3?.tags ?? []);
 
     const contractsRequest: GetContractsRequest = {
-        partyAddresses: [b32OracleAddr],
+        tags: tags,
     };
 
-    let allResponses: ContractHeader[] = [];
+    let allContractHeaders: ContractHeader[] = [];
     try {
-        allResponses = await getAllContracts(client, contractsRequest);
+        allContractHeaders = await getAllContracts(client, contractsRequest);
     } catch (e) {
         if (e instanceof RequestError) {
             if (e.name == '404') {
@@ -116,50 +123,115 @@ export async function getActiveContracts(
         currentTime.getTime() + 5 * 60 * 1000
     );
 
-    const promises = allResponses.map((contract) =>
-        client
-            .getNextStepsForContract(
-                contract.contractId,
-                mkEnvironment(timeBefore5Minutes)(timeAfter5Minutes),
-                []
-            )()
-            .then((nextAction) =>
-                pipe(
-                    nextAction,
-                    match(
-                        (_) => left('Error on next query'),
-                        (value: Next) => {
-                            const choices =
-                                value.applicable_inputs.choices.filter(
-                                    (elem: CanChoose) =>
-                                        validChoiceNames.includes(
-                                            elem.for_choice.choice_name
-                                        ) &&
-                                        partyCmp(
-                                            elem.for_choice.choice_owner,
-                                            mosAddress
-                                        ) === 'EqualTo'
-                                );
-                            return !choices?.length
-                                ? left('Empty choices')
-                                : right({
-                                      contractId: contract.contractId,
-                                      choiceId: choices[0].for_choice,
-                                      choiceBounds:
-                                          choices[0].can_choose_between,
-                                      invalidBefore: timeBefore5Minutes,
-                                      invalidHereafter: timeAfter5Minutes,
-                                  });
-                        }
-                    )
-                )
-            )
+    const addressResolvable: OracleRequest[] = [];
+    const charli3ResolvableData: [CanChoose, ContractHeader][] = [];
+    const charli3Resolvable: OracleRequest[] = [];
+
+    for (const contract of allContractHeaders) {
+        const nextSteps = await client.getNextStepsForContract(
+            contract.contractId,
+            mkEnvironment(timeBefore5Minutes)(timeAfter5Minutes),
+            []
+        )();
+
+        match(
+            (_) => left('Error on next query'),
+            (value: Next) => {
+                value.applicable_inputs.choices.forEach((choice) => {
+                    if (
+                        methods.address &&
+                        isResolvable(
+                            choice,
+                            methods.address.mosAddress,
+                            methods.address.choiceNames
+                        )
+                    ) {
+                        const newRequest: OracleRequest = {
+                            contractId: contract.contractId,
+                            choiceId: choice.for_choice,
+                            choiceBounds: choice.can_choose_between,
+                            invalidBefore: timeBefore5Minutes,
+                            invalidHereafter: timeAfter5Minutes,
+                            bridgeUtxo: none,
+                        };
+
+                        addressResolvable.push(newRequest);
+                    } else if (
+                        methods.charli3 &&
+                        isResolvable(
+                            choice,
+                            { role_token: methods.charli3.roleNames },
+                            [methods.charli3.choiceNames]
+                        )
+                    ) {
+                        charli3ResolvableData.push([choice, contract]);
+                    }
+                });
+            }
+        )(nextSteps);
+    }
+
+    if (methods.charli3 && charli3ResolvableData.length > 0) {
+        const bridgeUtxos = await lucid.utxosAt(methods.charli3.bridgeAddress);
+
+        for (const [choice, contract] of charli3ResolvableData) {
+            const roleMintingPolicy = unPolicyId(
+                contract.roleTokenMintingPolicyId
+            );
+            if (roleMintingPolicy === '') continue;
+
+            const assetClass =
+                roleMintingPolicy +
+                Buffer.from(methods.charli3.roleNames, 'utf-8').toString('hex');
+
+            const utxo = bridgeUtxos.find(
+                (utxo) => utxo.assets[assetClass] === 1n
+            );
+
+            if (!utxo) continue;
+
+            const newRequest: OracleRequest = {
+                contractId: contract.contractId,
+                choiceId: choice.for_choice,
+                choiceBounds: choice.can_choose_between,
+                invalidBefore: timeBefore5Minutes,
+                invalidHereafter: timeAfter5Minutes,
+                bridgeUtxo: some(utxo),
+            };
+            charli3Resolvable.push(newRequest);
+        }
+    }
+
+    scanLogger.info(
+        'AddressResolvable: ',
+        addressResolvable.map((elem) => elem.contractId)
+    );
+    scanLogger.info(
+        'Charli3Resolvable: ',
+        charli3Resolvable.map((elem) => elem.contractId)
     );
 
-    const allNextAction = await Promise.all(promises);
-    const contracts = allNextAction.filter(isRight).map((elem) => elem.right);
+    return addressResolvable.concat(charli3Resolvable);
+}
 
-    scanLogger.info(contracts.map((elem) => elem.contractId));
+/**
+ * Given a choice, check if the choice can be resolved by a MOS instance with
+ * the given configurations
+ * @param choice The choice to check
+ * @param party The party we want to use to resolve choices
+ * @param validChoiceNames The choice names that the given party can resolve
+ * @returns Wether or not the choice can be resolved
+ */
 
-    return contracts;
+function isResolvable(
+    choice: CanChoose,
+    party: Party,
+    validChoiceNames: string[]
+): Boolean {
+    const choiceId = choice.for_choice;
+
+    return (
+        partyCmp(choiceId.choice_owner, party) === 'EqualTo' &&
+        validChoiceNames.includes(choiceId.choice_name)
+    );
 }

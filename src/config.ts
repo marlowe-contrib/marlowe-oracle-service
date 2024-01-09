@@ -29,28 +29,30 @@ import { configLogger } from './logger.ts';
  * - the address of the decentralized oracle's feed
  * - the asset class of the token that identifies the dec oracle feed UTx0.
  */
-type OracleConfig<T> = {
+export type OracleConfig<T> = {
     choiceNames: ChoiceName;
     roleNames: string;
     bridgeUtxo: T;
     bridgeAddress: string;
     feedAddress: string;
     feedAssetClass: Unit;
+    tags: string[];
 };
 
 /**
  * Configuration for the address method.
  * Includes the address of the MOS and the Choice Names it resolves.
  */
-type AddressConfig = {
+export type AddressConfig = {
     mosAddress: Address;
     choiceNames: ChoiceName[];
+    tags: string[];
 };
 
 /**
  * Structure for configuration of the different resolve methods.
  */
-type ResolveMethod<T> = {
+export type ResolveMethod<T> = {
     address: AddressConfig | undefined;
     charli3: OracleConfig<T> | undefined;
 };
