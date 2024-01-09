@@ -183,12 +183,7 @@ export async function getActiveContracts(
                 (utxo) => utxo.assets[assetClass] === 1n
             );
 
-            if (!utxo) {
-                scanLogger.debug(
-                    'No Bridge UTxO found for contract:',
-                    contract.contractId
-                );
-            } else {
+            if (utxo) {
                 const newRequest: OracleRequest = {
                     contractId: contract.contractId,
                     choiceId: choice.for_choice,
@@ -198,6 +193,11 @@ export async function getActiveContracts(
                     bridgeUtxo: some(utxo),
                 };
                 charli3Resolvable.push(newRequest);
+            } else {
+                scanLogger.debug(
+                    'No Bridge UTxO found for contract:',
+                    contract.contractId
+                );
             }
         }
     }
