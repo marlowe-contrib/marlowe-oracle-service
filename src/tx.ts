@@ -2,6 +2,7 @@ import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
 import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
 import {
     Address,
+    Assets,
     C,
     Data,
     Datum,
@@ -332,7 +333,7 @@ export async function buildAndSubmit(
  * @param input The CML TransactionInput to parse
  * @returns the corresponding OutRef
  */
-function getRefFromInput(input: C.TransactionInput): OutRef {
+export function getRefFromInput(input: C.TransactionInput): OutRef {
     const txId = input.transaction_id().to_hex();
     const idx = Number(input.index().to_str());
     const ref: OutRef = { txHash: txId, outputIndex: idx };
@@ -416,11 +417,10 @@ function findDatumFromHash(
  */
 export function processMarloweOutput(
     transaction: C.Transaction,
-    lucid: Lucid,
     marloweAddress: Address
-): Tx {
+): [OutputData, Assets] | undefined {
     const outputs = transaction.body().outputs();
-    let finalTx: Tx = new Tx(lucid);
+    let result: [OutputData, Assets] | undefined = undefined;
     let outputsList: C.TransactionOutput[] = [];
 
     for (let i = 0; i < outputs.len(); i++) {
@@ -446,10 +446,10 @@ export function processMarloweOutput(
         const assets = valueToAssets(out.amount());
 
         const outputData: OutputData = { asHash: datumCBOR };
-        finalTx.payToContract(marloweAddress, outputData, assets);
+        result = [outputData, assets];
     }
 
-    return finalTx;
+    return result;
 }
 
 /**

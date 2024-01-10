@@ -22,7 +22,7 @@ import { scanLogger } from './logger.ts';
 
 import axios, { AxiosError } from 'axios';
 import { RequestError, ScanError, throwAxiosError } from './error.ts';
-import { Lucid, UTxO } from 'lucid-cardano';
+import { Lucid, UTxO, fromText, toUnit } from 'lucid-cardano';
 import { ResolveMethod } from './config.ts';
 
 /**
@@ -173,9 +173,10 @@ export async function getActiveContracts(
                 contract.roleTokenMintingPolicyId
             );
 
-            const assetClass =
-                roleMintingPolicy +
-                Buffer.from(methods.charli3.roleNames, 'utf-8').toString('hex');
+            const assetClass = toUnit(
+                roleMintingPolicy,
+                fromText(methods.charli3.roleNames)
+            );
 
             const utxo = bridgeUtxos.find(
                 (utxo) => utxo.assets[assetClass] === 1n
