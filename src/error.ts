@@ -70,7 +70,8 @@ type FeedErrorNames =
     | 'UtxoWOracleFeedNotFound'
     | 'UtxoWOracleFeedDoesNotHaveDatum'
     | 'UnexpectedCharli3DatumShape'
-    | 'Charli3PriceExpired';
+    | 'Charli3PriceExpired'
+    | 'FoundRequestForCharli3FeedButConfigurationNotSet';
 
 /**
  * Errors from the tx module.
