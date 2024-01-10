@@ -37,9 +37,10 @@ export type ApplyInputsToContractRequest = {
     inputs: Input[];
     invalidBefore: Date;
     invalidHereafter: Date;
-    bridgeUTxO: Option<UTxO>;
-    oracleUTxO: Option<UTxO>;
+    bridgeUtxo: Option<UTxO>;
+    oracleUtxo: Option<UTxO>;
 };
+
 /**
  * @description Currency pairs for which information can be provided by the respective sources
  */
@@ -62,7 +63,13 @@ export async function getApplyInputs(
     resMethods: ResolveMethod<UTxO>,
     lucid: Lucid
 ): Promise<ApplyInputsToContractRequest[]> {
-    const priceMap = await setPriceMap(requests, resMethods, lucid);
+    let priceMap = {};
+    try {
+        priceMap = await setPriceMap(requests, resMethods, lucid);
+    } catch (e) {
+        if (e instanceof FeedError)
+            feedLogger.error(e.name, e.message);
+    }
 
     const feeds = requests.map(async (request) => {
         const [input, utxo] = await feed(request, priceMap);
@@ -72,8 +79,8 @@ export async function getApplyInputs(
             inputs: [input],
             invalidBefore: request.invalidBefore,
             invalidHereafter: request.invalidHereafter,
-            bridgeUTxO: request.bridgeUtxo,
-            oracleUTxO: utxo,
+            bridgeUtxo: request.bridgeUtxo,
+            oracleUtxo: utxo,
         };
         return air;
     });
@@ -120,6 +127,7 @@ async function feed(
         const cn = request.choiceId.choice_name;
         const curPair = KnownCurrencyPairs.get(cn);
         if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource', cn);
+        if (!priceMap[cn]) throw new FeedError('FailedSettingPriceMap');
 
         const [price, utxo] = priceMap[cn];
 
@@ -334,7 +342,7 @@ function parseCharli3Price(datum: Datum): bigint {
         if (data2 instanceof Constr && data2.index === 2) {
             let data3 = data2.fields[0];
             if (data3 instanceof Map) {
-                if ((data3.get(BigInt(2)) as bigint) < date.getTime()) {
+                if ((data3.get(BigInt(2)) as bigint) > date.getTime()) {
                     return data3.get(BigInt(0)) as bigint;
                 } else {
                     throw new FeedError('Charli3PriceExpired');
