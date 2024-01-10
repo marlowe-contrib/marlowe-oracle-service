@@ -42,6 +42,7 @@ export async function main() {
 
             const applicableInputs = await getApplyInputs(
                 activeContracts,
+                mosConfig.resolveMethod.address.mosAddress.address,
                 mosConfig.resolveMethod,
                 lucid
             );
