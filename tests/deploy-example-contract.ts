@@ -1,8 +1,8 @@
 import { parseMOSEnv } from '../src/config.ts';
-import { processMarloweOutput } from '../src/tx.ts';
+import { getRefFromInput, processMarloweOutput } from '../src/tx.ts';
 
 import { mkRestClient } from 'marlowe-runtime-rest-client-txpipe';
-import { Tags, addressBech32 } from '@marlowe.io/runtime-core';
+import { addressBech32 } from '@marlowe.io/runtime-core';
 import { Contract } from '@marlowe.io/language-core-v1';
 import {
     CreateContractRequest,
@@ -10,7 +10,18 @@ import {
 } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/index';
 import { Choice } from 'marlowe-language-core-v1-txpipe';
 
-import { C, Data, Lucid, Script, Tx, toHex } from 'lucid-cardano';
+import {
+    C,
+    Data,
+    Lucid,
+    OutRef,
+    Script,
+    Tx,
+    UTxO,
+    fromText,
+    toHex,
+    toUnit,
+} from 'lucid-cardano';
 
 import { Command } from 'commander';
 import { readFileSync } from 'fs';
@@ -99,6 +110,19 @@ try {
 
     const newTx = new Tx(lucid);
 
+    const inputs = transaction.body().inputs();
+
+    let inputRefs: OutRef[] = [];
+    for (let i = 0; i < inputs.len(); i++) {
+        const input = inputs.get(i);
+        const ref = getRefFromInput(input);
+        inputRefs.push(ref);
+    }
+
+    const inputUtxos: UTxO[] = await lucid.utxosByOutRef(inputRefs);
+
+    newTx.collectFrom(inputUtxos);
+
     if (choiceOwnerIsRole) {
         const minted = transaction.body().mint()?.as_positive_multiasset();
 
@@ -106,12 +130,8 @@ try {
             throw new Error('Minting more or less than 1 policy');
 
         const oracleTokenPolicy = minted.keys().get(0).to_hex();
-        const oracleTokenAsset =
-            oracleTokenPolicy +
-            Buffer.from('Charli3 Oracle', 'utf-8').toString('hex');
-        const threadTokenAsset =
-            oracleTokenPolicy +
-            Buffer.from('Thread Token', 'utf-8').toString('hex');
+        const oracleTokenAsset = toUnit(oracleTokenPolicy, 'Charli3 Oracle');
+        const threadTokenAsset = toUnit(oracleTokenPolicy, 'Thread Token');
 
         newTx.mintAssets(
             { [oracleTokenAsset]: 1n, [threadTokenAsset]: 1n },
@@ -141,6 +161,12 @@ try {
         if (!mintingPolicy) throw new Error('No matching minting policy found');
 
         newTx.attachMintingPolicy(mintingPolicy);
+
+        newTx.payToAddressWithData(
+            'addr_test1wpw0vwcfs7ga442vnp4skf8ecezauv3x5lxt6u0avnez2xqj4qkwc',
+            { asHash: Data.to(fromText('Thread Token')) },
+            { [oracleTokenAsset]: 1n }
+        );
     }
 
     newTx.payToAddressWithData(mosEnv.marloweValidatorAddress, data, assets);

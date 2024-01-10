@@ -333,7 +333,7 @@ export async function buildAndSubmit(
  * @param input The CML TransactionInput to parse
  * @returns the corresponding OutRef
  */
-function getRefFromInput(input: C.TransactionInput): OutRef {
+export function getRefFromInput(input: C.TransactionInput): OutRef {
     const txId = input.transaction_id().to_hex();
     const idx = Number(input.index().to_str());
     const ref: OutRef = { txHash: txId, outputIndex: idx };
