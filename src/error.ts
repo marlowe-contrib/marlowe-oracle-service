@@ -92,7 +92,9 @@ type BuildTransactionErrorNames =
     | 'NoTransactionInputFoundOnInputsList'
     | 'MarloweOutputWithoutDatum'
     | 'MoreThanOneMarloweContractOutput'
-    | 'NoDatumFoundOnUTxO';
+    | 'NoDatumFoundOnUTxO'
+    | 'NoBridgeValidatorUTxOConfigured'
+    | 'BridgeUTxOIsMissingDatumHash';
 
 /**
  * Http requests errors.
