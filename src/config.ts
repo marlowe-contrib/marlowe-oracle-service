@@ -32,7 +32,7 @@ import { configLogger } from './logger.ts';
 export type OracleConfig<T> = {
     choiceNames: ChoiceName;
     roleNames: string;
-    bridgeUtxo: T;
+    bridgeValidatorUtxo: T;
     bridgeAddress: string;
     feedAddress: string;
     feedAssetClass: Unit;
@@ -319,7 +319,7 @@ export async function setOracleConfig(
     if (mc.resolveMethod.charli3) {
         const bridgeUtxo: UTxO = await getUTxOWithScriptRef(
             lucid,
-            mc.resolveMethod.charli3.bridgeUtxo,
+            mc.resolveMethod.charli3.bridgeValidatorUtxo,
             mc.resolveMethod.charli3.bridgeAddress
         );
 
@@ -329,7 +329,7 @@ export async function setOracleConfig(
                 ...mc.resolveMethod,
                 charli3: {
                     ...mc.resolveMethod.charli3,
-                    bridgeUtxo: bridgeUtxo,
+                    bridgeValidatorUtxo: bridgeUtxo,
                 },
             },
         };

@@ -11,7 +11,7 @@
     "charli3" : {
       "choiceNames": "Charli3 ADAUSD",
       "roleNames": "Charli3 Oracle",
-      "bridgeUtxo": {
+      "bridgeValidatorUtxo": {
         "txHash": "6d9ccb38415db7ac647d3b68098658f66dd392364a1ce42fede5a998187576b6",
         "outputIndex": 0
       },
