@@ -22,7 +22,7 @@ import { scanLogger } from './logger.ts';
 
 import axios, { AxiosError } from 'axios';
 import { RequestError, ScanError, throwAxiosError } from './error.ts';
-import { Lucid, UTxO, toUnit } from 'lucid-cardano';
+import { Lucid, UTxO, fromText, toUnit } from 'lucid-cardano';
 import { ResolveMethod } from './config.ts';
 
 /**
@@ -175,7 +175,7 @@ export async function getActiveContracts(
 
             const assetClass = toUnit(
                 roleMintingPolicy,
-                methods.charli3.roleNames
+                fromText(methods.charli3.roleNames)
             );
 
             const utxo = bridgeUtxos.find(

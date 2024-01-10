@@ -130,8 +130,14 @@ try {
             throw new Error('Minting more or less than 1 policy');
 
         const oracleTokenPolicy = minted.keys().get(0).to_hex();
-        const oracleTokenAsset = toUnit(oracleTokenPolicy, 'Charli3 Oracle');
-        const threadTokenAsset = toUnit(oracleTokenPolicy, 'Thread Token');
+        const oracleTokenAsset = toUnit(
+            oracleTokenPolicy,
+            fromText('Charli3 Oracle')
+        );
+        const threadTokenAsset = toUnit(
+            oracleTokenPolicy,
+            fromText('Thread Token')
+        );
 
         newTx.mintAssets(
             { [oracleTokenAsset]: 1n, [threadTokenAsset]: 1n },
