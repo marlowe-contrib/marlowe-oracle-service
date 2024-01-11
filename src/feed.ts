@@ -19,7 +19,7 @@ import { FeedError, RequestError } from './error.ts';
 import { feedLogger } from './logger.ts';
 import { Constr, Data, Datum, Lucid, UTxO } from 'lucid-cardano';
 import { OracleConfig, ResolveMethod } from './config.ts';
-import { Option, none, some } from 'fp-ts/lib/Option.js';
+import { Option, isNone, none, some } from 'fp-ts/lib/Option.js';
 
 type Currency = 'ADA' | 'USD';
 
@@ -29,7 +29,7 @@ type CurrencyPair = {
     to: Currency;
 };
 
-type PriceMap = Record<string, [bigint, Option<UTxO>]>;
+type PriceMap = Record<string, Option<[bigint, Option<UTxO>]>>;
 
 export type ApplyInputsToContractRequest = {
     contractId: ContractId;
@@ -129,10 +129,12 @@ async function feed(
         if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource', cn);
         if (!priceMap[cn]) throw new FeedError('FailedSettingPriceMap');
 
-        const [price, utxo] = priceMap[cn];
+        const pm = priceMap[cn];
 
-        if (!(price || utxo))
-            throw new FeedError('PriceUndefinedForChoiceName', cn);
+        if (isNone(pm))
+            throw new FeedError('PriceUndefinedForChoiceName');
+
+        const [price, utxo] = pm.value;
 
         if (withinBounds(price, request.choiceBounds)) {
             const input: Input = makeInput(request.choiceId, price);
@@ -282,23 +284,31 @@ async function setPriceMap(
         if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource');
 
         let [price, utxo]: [bigint, Option<UTxO>] = [0n, none];
-        switch (curPair.source) {
-            case 'Coingecko':
-                price = await getCoingeckoPrice(curPair as CurrencyPair);
-                break;
-            case 'Charli3':
-                if (!resMethods.charli3)
-                    throw new FeedError(
-                        'FoundRequestForCharli3FeedButConfigurationNotSet'
-                    );
+        try {
+            switch (curPair.source) {
+                case 'Coingecko':
+                    price = await getCoingeckoPrice(curPair as CurrencyPair);
+                    break;
+                case 'Charli3':
+                    if (!resMethods.charli3)
+                        throw new FeedError(
+                            'FoundRequestForCharli3FeedButConfigurationNotSet'
+                        );
 
-                [price, utxo] = await getCharli3Price(
-                    resMethods.charli3,
-                    lucid
-                );
-                break;
+                    [price, utxo] = await getCharli3Price(
+                        resMethods.charli3,
+                        lucid
+                    );
+                    break;
+            }
+        } catch (e) {
+            if (e instanceof FeedError)
+                feedLogger.error(e.name, e.message);
         }
-        priceMap[cn] = [price, utxo];
+        if (price && utxo)
+            priceMap[cn] = some([price, utxo]);
+        else
+            priceMap[cn] = none;
     }
 
     return priceMap;
