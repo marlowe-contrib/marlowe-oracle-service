@@ -2,25 +2,24 @@ import fetch from 'node-fetch';
 
 import {
     AddressBech32,
-    addressBech32,
     ContractId,
+    addressBech32,
 } from '@marlowe.io/runtime-core';
 import {
-    Address,
     ChoiceId,
     Bound,
     Input,
-    InputContent,
     IChoice,
     ChoiceName,
     ChosenNum,
 } from 'marlowe-language-core-v1-txpipe';
 
-import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
-
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
 import { feedLogger } from './logger.ts';
+import { Constr, Data, Datum, Lucid, UTxO } from 'lucid-cardano';
+import { OracleConfig, ResolveMethod } from './config.ts';
+import { Option, isNone, none, some } from 'fp-ts/lib/Option.js';
 
 type Currency = 'ADA' | 'USD';
 
@@ -30,35 +29,58 @@ type CurrencyPair = {
     to: Currency;
 };
 
+type PriceMap = Record<string, Option<[bigint, Option<UTxO>]>>;
+
+export type ApplyInputsToContractRequest = {
+    contractId: ContractId;
+    changeAddress: AddressBech32;
+    inputs: Input[];
+    invalidBefore: Date;
+    invalidHereafter: Date;
+    bridgeUtxo: Option<UTxO>;
+    oracleUtxo: Option<UTxO>;
+};
+
 /**
  * @description Currency pairs for which information can be provided by the respective sources
  */
 const KnownCurrencyPairs = new Map([
     ['Coingecko ADAUSD', { source: 'Coingecko', from: 'ADA', to: 'USD' }],
     ['Coingecko USDADA', { source: 'Coingecko', from: 'USD', to: 'ADA' }],
+    ['Charli3 ADAUSD', { source: 'Charli3', from: 'USD', to: 'ADA' }],
 ]);
 
 /**
- * @param mosAddress The address of the MOS
  * @param request Necessary information about the feed to provide and the Contract
  * that requires it.
+ * @param mosAddress The address of the MOS
+ * @param resMethods Configuration of the different resolve methods.
  * @returns A list of apply inputs, ready to be used on the applyInputsToContract endpoint.
  */
 export async function getApplyInputs(
-    mosAddress: Address,
-    requests: OracleRequest[]
+    requests: OracleRequest[],
+    mosAddress: string,
+    resMethods: ResolveMethod<UTxO>,
+    lucid: Lucid
 ): Promise<ApplyInputsToContractRequest[]> {
-    const priceMap = await setPriceMap(requests);
+    let priceMap = {};
+    try {
+        priceMap = await setPriceMap(requests, resMethods, lucid);
+    } catch (e) {
+        if (e instanceof FeedError)
+            feedLogger.error(e.name, e.message);
+    }
 
     const feeds = requests.map(async (request) => {
-        const input = await feed(request, priceMap);
+        const [input, utxo] = await feed(request, priceMap);
         const air: ApplyInputsToContractRequest = {
             contractId: request.contractId,
-            changeAddress: addressBech32(mosAddress.address),
+            changeAddress: addressBech32(mosAddress),
             inputs: [input],
-            metadata: {},
             invalidBefore: request.invalidBefore,
             invalidHereafter: request.invalidHereafter,
+            bridgeUtxo: request.bridgeUtxo,
+            oracleUtxo: utxo,
         };
         return air;
     });
@@ -99,20 +121,24 @@ function prettyInputs(inputs: Input[]): [ChoiceName, ChosenNum][] {
  */
 async function feed(
     request: OracleRequest,
-    priceMap: Record<string, bigint>
-): Promise<Input> {
+    priceMap: PriceMap
+): Promise<[Input, Option<UTxO>]> {
     try {
         const cn = request.choiceId.choice_name;
         const curPair = KnownCurrencyPairs.get(cn);
         if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource', cn);
+        if (!priceMap[cn]) throw new FeedError('FailedSettingPriceMap');
 
-        const price = priceMap[cn];
+        const pm = priceMap[cn];
 
-        if (!price) throw new FeedError('PriceUndefinedForChoiceName', cn);
+        if (isNone(pm))
+            throw new FeedError('PriceUndefinedForChoiceName');
+
+        const [price, utxo] = pm.value;
 
         if (withinBounds(price, request.choiceBounds)) {
             const input: Input = makeInput(request.choiceId, price);
-            return input;
+            return [input, utxo];
         } else {
             throw new FeedError('FeedResultIsOutOfBounds');
         }
@@ -243,26 +269,101 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
  * @returns Record containing the price for each ChoiceName
  */
 async function setPriceMap(
-    requests: OracleRequest[]
-): Promise<Record<string, bigint>> {
+    requests: OracleRequest[],
+    resMethods: ResolveMethod<UTxO>,
+    lucid: Lucid
+): Promise<PriceMap> {
     let requestedCN: Set<string> = new Set();
     requests.map((req) => {
         requestedCN.add(req.choiceId.choice_name);
     });
 
-    let priceMap: Record<string, bigint> = {};
+    let priceMap: PriceMap = {};
     for (const cn of requestedCN) {
         const curPair = KnownCurrencyPairs.get(cn);
         if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource');
 
-        let price = 0n;
-        switch (curPair.source) {
-            case 'Coingecko':
-                price = await getCoingeckoPrice(curPair as CurrencyPair);
-                break;
+        let [price, utxo]: [bigint, Option<UTxO>] = [0n, none];
+        try {
+            switch (curPair.source) {
+                case 'Coingecko':
+                    price = await getCoingeckoPrice(curPair as CurrencyPair);
+                    break;
+                case 'Charli3':
+                    if (!resMethods.charli3)
+                        throw new FeedError(
+                            'FoundRequestForCharli3FeedButConfigurationNotSet'
+                        );
+
+                    [price, utxo] = await getCharli3Price(
+                        resMethods.charli3,
+                        lucid
+                    );
+                    break;
+            }
+        } catch (e) {
+            if (e instanceof FeedError)
+                feedLogger.error(e.name, e.message);
         }
-        priceMap[cn] = price;
+        if (price && utxo)
+            priceMap[cn] = some([price, utxo]);
+        else
+            priceMap[cn] = none;
     }
 
     return priceMap;
+}
+
+/**
+ * Queries Charli3's Oracle Feed UTxO to obtain the price that is contained in its datum.
+ * @param c3Config OracleConfig that contains necessary information to query the Charli3 ADAUSD feed
+ * @param lucid Instance of Lucid used to query the blockchain
+ * @returns A tuple containing the exchange rate for ADAUSD and the Oracle Feed UTxO
+ */
+async function getCharli3Price(
+    c3Config: OracleConfig<UTxO>,
+    lucid: Lucid
+): Promise<[bigint, Option<UTxO>]> {
+    const charli3Utxo = await lucid.utxosAt(c3Config.feedAddress);
+
+    const feedUtxo = charli3Utxo.filter(
+        (utxo) => utxo.assets[c3Config.feedAssetClass] === 1n
+    );
+
+    if (!feedUtxo[0]) throw new FeedError('UtxoWOracleFeedNotFound');
+    if (!feedUtxo[0].datum)
+        throw new FeedError('UtxoWOracleFeedDoesNotHaveDatum');
+
+    const price: bigint = parseCharli3Price(feedUtxo[0].datum);
+
+    return [price, some(feedUtxo[0])];
+}
+
+/**
+ * Utility to parse the datum of the Charli3 Oracle Feed UTxO to read the price.
+ * @param datum Datum of the Oracle Feed UTxO
+ * @returns Exchange rate for ADAUSD
+ */
+function parseCharli3Price(datum: Datum): bigint {
+    const date = new Date();
+    let data = Data.from<Data>(datum);
+    if (data instanceof Constr && data.index === 0) {
+        let data2 = data.fields[0];
+        if (data2 instanceof Constr && data2.index === 2) {
+            let data3 = data2.fields[0];
+            if (data3 instanceof Map) {
+                if ((data3.get(BigInt(2)) as bigint) > date.getTime()) {
+                    return data3.get(BigInt(0)) as bigint;
+                } else {
+                    throw new FeedError('Charli3PriceExpired');
+                }
+            } else {
+                throw new FeedError('UnexpectedCharli3DatumShape');
+            }
+        } else {
+            throw new FeedError('UnexpectedCharli3DatumShape');
+        }
+    } else {
+        throw new FeedError('UnexpectedCharli3DatumShape');
+    }
 }

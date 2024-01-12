@@ -66,7 +66,13 @@ type FeedErrorNames =
     | 'UnknownBaseCurrencyForCGQuery'
     | 'UnknownQuoteCurrencyForCGQuery'
     | 'PriceUndefinedForChoiceName'
-    | 'UnknownError';
+    | 'UnknownError'
+    | 'UtxoWOracleFeedNotFound'
+    | 'UtxoWOracleFeedDoesNotHaveDatum'
+    | 'UnexpectedCharli3DatumShape'
+    | 'Charli3PriceExpired'
+    | 'FoundRequestForCharli3FeedButConfigurationNotSet'
+    | 'FailedSettingPriceMap';
 
 /**
  * Errors from the tx module.

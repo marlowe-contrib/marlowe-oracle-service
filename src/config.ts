@@ -59,7 +59,7 @@ export type ResolveMethod<T> = {
  * Configuration structure for the Marlowe Oracle Service.
  * Specifies delay (milliseconds) and resolution methods.
  */
-type MOSConfig<T> = {
+export type MOSConfig<T> = {
     delay: number;
     tags: string[];
     resolveMethod: ResolveMethod<T>;
