@@ -12,10 +12,10 @@
       "choiceNames": "Charli3 ADAUSD",
       "roleNames": "Charli3 Oracle",
       "bridgeUtxo": {
-        "txHash": "1e8464fc6ac5ed38bfdd6f825919c704f3c3016716c0e7d17a0d44c4357bd29e",
+        "txHash": "c8fb22e6ab20ee664221e810c85a3f8133d4549f2789e00860b0ef90878c6fed",
         "outputIndex": 0
       },
-      "bridgeAddress": "addr_test1wpw0vwcfs7ga442vnp4skf8ecezauv3x5lxt6u0avnez2xqj4qkwc",
+      "bridgeAddress": "addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu",
       "feedAddress": "addr_test1wzn5ee2qaqvly3hx7e0nk3vhm240n5muq3plhjcnvx9ppjgf62u6a",
       "feedAssetClass": "1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf074f7261636c6546656564"
     }
