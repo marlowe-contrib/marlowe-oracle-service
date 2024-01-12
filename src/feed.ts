@@ -130,8 +130,7 @@ async function feed(
 
         const pm = priceMap[cn];
 
-        if (isNone(pm))
-            throw new FeedError('PriceUndefinedForChoiceName');
+        if (isNone(pm)) throw new FeedError('PriceUndefinedForChoiceName');
 
         const [price, utxo] = pm.value;
 
@@ -301,13 +300,10 @@ async function setPriceMap(
                     break;
             }
         } catch (e) {
-            if (e instanceof FeedError)
-                feedLogger.error(e.name, e.message);
+            if (e instanceof FeedError) feedLogger.error(e.name, e.message);
         }
-        if (price && utxo)
-            priceMap[cn] = some([price, utxo]);
-        else
-            priceMap[cn] = none;
+        if (price && utxo) priceMap[cn] = some([price, utxo]);
+        else priceMap[cn] = none;
     }
 
     return priceMap;
