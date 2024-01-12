@@ -1,6 +1,6 @@
 {
   "delay": 30000,
-  "tags": ["requires.marlowe.oracle.test"],
+  "tags": ["requires.marlowe.oracle.alpha.test"],
   "resolveMethod": {
     "address" :  {
       "mosAddress": {

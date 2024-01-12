@@ -361,7 +361,7 @@ export async function buildAndSubmit(
             } else if (error instanceof BuildTransactionError) {
                 txLogger.error('Unexpected build error occurred', error);
             } else {
-                txLogger.error('Unexpected error occurred', error)
+                txLogger.error('Unexpected error occurred', error);
             }
         }
     } else {

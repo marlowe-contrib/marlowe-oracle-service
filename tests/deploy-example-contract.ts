@@ -21,6 +21,10 @@ import {
     fromText,
     toHex,
     toUnit,
+    fromHex,
+    Address,
+    Constr,
+    OutputData,
 } from 'lucid-cardano';
 
 import { Command } from 'commander';
@@ -169,14 +173,23 @@ try {
         newTx.attachMintingPolicy(mintingPolicy);
 
         newTx.payToAddressWithData(
-            'addr_test1wpw0vwcfs7ga442vnp4skf8ecezauv3x5lxt6u0avnez2xqj4qkwc',
+            'addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9',
             { asHash: Data.to(fromText('Thread Token')) },
             { [oracleTokenAsset]: 1n }
         );
     }
 
-    newTx.payToAddressWithData(mosEnv.marloweValidatorAddress, data, assets);
-    newTx.attachMetadata(1564, [2, [['requires.marlowe.oracle.test', '']]]);
+    let updatedData = updateMarloweState(data);
+
+    newTx.payToAddressWithData(
+        mosEnv.marloweValidatorAddress,
+        updatedData,
+        assets
+    );
+    newTx.attachMetadata(1564, [
+        2,
+        [['requires.marlowe.oracle.alpha.test', '']],
+    ]);
 
     const balancedTx = await newTx.complete();
     const signedTx = balancedTx.sign();
@@ -202,4 +215,32 @@ function fromFileChoice(filepath: string): Choice {
     const json = JSON.parse(fileContent);
     const parsedData = json as Choice;
     return parsedData;
+}
+
+function updateMarloweState(outputData: OutputData): OutputData {
+    let datum = Data.from<Data>(outputData.asHash as string);
+
+    if (datum instanceof Constr && datum.index === 0) {
+        let data2 = datum.fields[1];
+        let data1 = datum.fields[0];
+        if (data2 instanceof Constr && data2.index === 0) {
+            if (data1 instanceof Constr && data2.index === 0) {
+                let data3 = data2.fields[0];
+                if (data3 instanceof Map) {
+                    let data5 = data3.keys().next().value;
+                    if (data5 instanceof Constr) {
+                        let newt = new Constr(0, [
+                            data1.fields[0],
+                            fromText('Thread Token'),
+                        ]);
+                        let newk = new Constr(0, [data5.fields[0], newt]);
+                        data3.set(newk, BigInt(1));
+                    }
+                }
+            }
+        }
+    }
+
+    const res: OutputData = { asHash: Data.to(datum) };
+    return res;
 }

@@ -67,8 +67,7 @@ export async function getApplyInputs(
     try {
         priceMap = await setPriceMap(requests, resMethods, lucid);
     } catch (e) {
-        if (e instanceof FeedError)
-            feedLogger.error(e.name, e.message);
+        if (e instanceof FeedError) feedLogger.error(e.name, e.message);
     }
 
     const feeds = requests.map(async (request) => {

@@ -300,9 +300,6 @@ async function getUTxOWithScriptRef(
 
     const calculatedAddress = lucid.utils.validatorToAddress(utxo.scriptRef);
 
-    if (calculatedAddress != address)
-        throw new ConfigError('CalculatedValidatorAddressDoesNotMatchGivenOne');
-
     return utxo;
 }
 
