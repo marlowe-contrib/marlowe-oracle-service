@@ -9,7 +9,8 @@
     "build": "tsc",
     "lint-check": "prettier src tests --check --config .prettierrc.json",
     "lint-write": "prettier src tests --write --config .prettierrc.json",
-    "deploy-example": "npx ts-node tests/deploy-example-contract.ts"
+    "deploy-example": "npx ts-node tests/deploy-example-contract.ts",
+    "deploy-bridge": "npx ts-node tests/deploy-bridge.ts"
   },
   "author": "",
   "license": "ISC",
