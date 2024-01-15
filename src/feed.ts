@@ -59,7 +59,6 @@ const KnownCurrencyPairs = new Map([
  */
 export async function getApplyInputs(
     requests: OracleRequest[],
-    mosAddress: string,
     resMethods: ResolveMethod<UTxO>,
     lucid: Lucid
 ): Promise<ApplyInputsToContractRequest[]> {
@@ -69,7 +68,7 @@ export async function getApplyInputs(
     } catch (e) {
         if (e instanceof FeedError) feedLogger.error(e.name, e.message);
     }
-
+    const mosAddress = await lucid.wallet.address();
     const feeds = requests.map(async (request) => {
         const [input, utxo] = await feed(request, priceMap);
         const air: ApplyInputsToContractRequest = {

@@ -173,22 +173,18 @@ try {
         newTx.attachMintingPolicy(mintingPolicy);
 
         newTx.payToAddressWithData(
-            'addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9',
+            'addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu',
             { asHash: Data.to(fromText('Thread Token')) },
             { [oracleTokenAsset]: 1n }
         );
+
+        data = updateMarloweState(data);
     }
 
-    let updatedData = updateMarloweState(data);
-
-    newTx.payToAddressWithData(
-        mosEnv.marloweValidatorAddress,
-        updatedData,
-        assets
-    );
+    newTx.payToAddressWithData(mosEnv.marloweValidatorAddress, data, assets);
     newTx.attachMetadata(1564, [
         2,
-        [['requires.marlowe.oracle.alpha.test', '']],
+        [['requires.marlowe.oracle.test.alpha.1', '']],
     ]);
 
     const balancedTx = await newTx.complete();

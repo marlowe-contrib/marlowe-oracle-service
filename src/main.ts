@@ -24,10 +24,6 @@ export async function main() {
         const client = mkRestClient(rawMosEnv.marloweRuntimeUrl);
 
         const mosConfig = await setOracleConfig(rawMosConfig, lucid);
-
-        if (!mosConfig.resolveMethod.address)
-            throw new Error('NoAddressConfig');
-
         const mosEnv = await setMarloweUTxO(rawMosEnv, lucid);
 
         configLogger.debug(mosConfig);
@@ -43,7 +39,6 @@ export async function main() {
 
             const applicableInputs = await getApplyInputs(
                 activeContracts,
-                mosConfig.resolveMethod.address.mosAddress.address,
                 mosConfig.resolveMethod,
                 lucid
             );
