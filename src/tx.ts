@@ -1,9 +1,9 @@
 import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
-import { ApplyInputsToContractRequest } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/transaction/endpoints/collection';
 import {
     Address,
     Assets,
     C,
+    Constr,
     Data,
     Datum,
     ExternalWallet,
@@ -21,7 +21,13 @@ import { Input, IChoice, Party } from 'marlowe-language-core-v1-txpipe';
 import { Payment } from 'marlowe-language-core-v1-txpipe/dist/esm/transaction.ts';
 import MLC from 'marlowe-language-core-v1-txpipe';
 import { TxOutRef, unTxOutRef } from '@marlowe.io/runtime-core';
-import { match, toUndefined } from 'fp-ts/lib/Option.js';
+import {
+    Option,
+    isNone,
+    isSome,
+    match,
+    toUndefined,
+} from 'fp-ts/lib/Option.js';
 import { ContractDetails } from 'marlowe-runtime-rest-client-txpipe/dist/esm/contract/details';
 import { constUndefined } from 'fp-ts/lib/function.js';
 
@@ -32,6 +38,7 @@ import {
     throwAxiosError,
 } from './error.ts';
 import { txLogger } from './logger.ts';
+import { ApplyInputsToContractRequest } from './feed.ts';
 
 /**
  * Represents the request structure for the Marlowe Apply Service (MAS).
@@ -201,7 +208,7 @@ async function getApplyRequests(
     const newIB = new Date(newIBUNIX);
 
     const newRequest: MASRequest = {
-        version: request.version ?? 'v1',
+        version: 'v1',
         marloweData: utxo.datum,
         invalidBefore: newIB,
         invalidHereafter: request.invalidHereafter,
@@ -225,7 +232,7 @@ async function getApplyRequests(
         }
 
         newTx.validFrom(newIBUNIX);
-        newTx.validTo(request.invalidHereafter);
+        newTx.validTo(request.invalidHereafter.getTime());
 
         newTx.collectFrom([utxo], applyResponse.redeemerCborHex);
         newTx.payToContract(
@@ -269,7 +276,8 @@ export async function buildAndSubmit(
     client: RestClient,
     lucid: Lucid,
     applicableInputs: ApplyInputsToContractRequest[],
-    mosEnv: MOSEnv<UTxO>
+    mosEnv: MOSEnv<UTxO>,
+    bridgeValidatorUtxo: Option<UTxO>
 ): Promise<void> {
     const submitted: string[] = [];
     if (applicableInputs.length > 0) {
@@ -288,7 +296,38 @@ export async function buildAndSubmit(
                     utxo,
                     req
                 );
-                if (tx) allTxs.push(tx);
+                if (tx) {
+                    if (isSome(req.oracleUtxo)) {
+                        tx.readFrom([req.oracleUtxo.value]);
+                    }
+
+                    if (isSome(req.bridgeUtxo)) {
+                        if (isNone(bridgeValidatorUtxo))
+                            throw new BuildTransactionError(
+                                'NoBridgeValidatorUTxOConfigured'
+                            );
+
+                        tx.readFrom([bridgeValidatorUtxo.value]);
+
+                        tx.collectFrom(
+                            [req.bridgeUtxo.value],
+                            Data.to(new Constr(1, []))
+                        );
+
+                        if (!req.bridgeUtxo.value.datumHash)
+                            throw new BuildTransactionError(
+                                'BridgeUTxOIsMissingDatumHash'
+                            );
+
+                        tx.payToContract(
+                            req.bridgeUtxo.value.address,
+                            { hash: req.bridgeUtxo.value.datumHash },
+                            req.bridgeUtxo.value.assets
+                        );
+                    }
+
+                    allTxs.push(tx);
+                }
             }
 
             allTxs = allTxs.map((tx) => {
@@ -320,6 +359,8 @@ export async function buildAndSubmit(
                 const e = error as AxiosError;
                 throwAxiosError(e);
             } else if (error instanceof BuildTransactionError) {
+                txLogger.error('Unexpected build error occurred', error);
+            } else {
                 txLogger.error('Unexpected error occurred', error);
             }
         }

@@ -1,62 +1,62 @@
 {
-  "preamble": {
-    "title": "marlowe-oracle-service/validators",
-    "description": "Aiken contracts for project 'marlowe-oracle-service/validators'",
-    "version": "0.0.0",
-    "plutusVersion": "v2",
-    "license": "Apache-2.0"
-  },
-  "validators": [
-    {
-      "title": "validator.always_true",
-      "datum": {
-        "title": "_datum",
-        "schema": {
-          "$ref": "#/definitions/Data"
-        }
-      },
-      "redeemer": {
-        "title": "_redeemer",
-        "schema": {
-          "$ref": "#/definitions/Data"
-        }
-      },
-      "compiledCode": "500100003222253330044a22930b2b9a01",
-      "hash": "90592520b329fe08f0e93946ecd405e49b7480795e27cb618f002d88"
+    "preamble": {
+        "title": "marlowe-oracle-service/validators",
+        "description": "Aiken contracts for project 'marlowe-oracle-service/validators'",
+        "version": "0.0.0",
+        "plutusVersion": "v2",
+        "license": "Apache-2.0"
     },
-    {
-      "title": "validator.spend",
-      "datum": {
-        "title": "_datum",
-        "schema": {
-          "$ref": "#/definitions/Data"
-        }
-      },
-      "redeemer": {
-        "title": "redeemer",
-        "schema": {
-          "$ref": "#/definitions/validator~1Redeemer"
-        }
-      },
-      "compiledCode": "587c0100003232323232323232322223253330083253330093370e90000008a5114a0600e0022930b1900199299980419b874800000454ccc02cc028dd50018a4c2c2c600c0046600200290001111199980319b8700100300a233330050053370000890011806000801001118019baa0015734aae7555cf2ab9f5742ae89",
-      "hash": "5b0d8de22718dbeb8e3ef902e49ec638b2797454cece717f20131232"
-    }
-  ],
-  "definitions": {
-    "Data": {
-      "title": "Data",
-      "description": "Any Plutus data."
-    },
-    "validator/Redeemer": {
-      "title": "Redeemer",
-      "anyOf": [
+    "validators": [
         {
-          "title": "SpendScript",
-          "dataType": "constructor",
-          "index": 0,
-          "fields": []
+            "title": "validator.always_true",
+            "datum": {
+                "title": "_datum",
+                "schema": {
+                    "$ref": "#/definitions/Data"
+                }
+            },
+            "redeemer": {
+                "title": "_redeemer",
+                "schema": {
+                    "$ref": "#/definitions/Data"
+                }
+            },
+            "compiledCode": "500100003222253330044a22930b2b9a01",
+            "hash": "90592520b329fe08f0e93946ecd405e49b7480795e27cb618f002d88"
+        },
+        {
+            "title": "validator.spend",
+            "datum": {
+                "title": "_datum",
+                "schema": {
+                    "$ref": "#/definitions/Data"
+                }
+            },
+            "redeemer": {
+                "title": "redeemer",
+                "schema": {
+                    "$ref": "#/definitions/validator~1Redeemer"
+                }
+            },
+            "compiledCode": "587c0100003232323232323232322223253330083253330093370e90000008a5114a0600e0022930b1900199299980419b874800000454ccc02cc028dd50018a4c2c2c600c0046600200290001111199980319b8700100300a233330050053370000890011806000801001118019baa0015734aae7555cf2ab9f5742ae89",
+            "hash": "5b0d8de22718dbeb8e3ef902e49ec638b2797454cece717f20131232"
         }
-      ]
+    ],
+    "definitions": {
+        "Data": {
+            "title": "Data",
+            "description": "Any Plutus data."
+        },
+        "validator/Redeemer": {
+            "title": "Redeemer",
+            "anyOf": [
+                {
+                    "title": "SpendScript",
+                    "dataType": "constructor",
+                    "index": 0,
+                    "fields": []
+                }
+            ]
+        }
     }
-  }
 }

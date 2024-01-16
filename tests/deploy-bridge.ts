@@ -13,7 +13,9 @@ const mosEnv = parseMOSEnv();
 const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
 lucid.selectWalletFromPrivateKey(mosEnv.signingKey);
 
-const validators = JSON.parse(fs.readFileSync('./tests/validators/plutus.json', 'utf-8')).validators;
+const validators = JSON.parse(
+    fs.readFileSync('./tests/validators/plutus.json', 'utf-8')
+).validators;
 
 const alwaysTrue = validators[0].compiledCode;
 

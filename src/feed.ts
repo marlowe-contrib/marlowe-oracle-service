@@ -59,7 +59,6 @@ const KnownCurrencyPairs = new Map([
  */
 export async function getApplyInputs(
     requests: OracleRequest[],
-    mosAddress: string,
     resMethods: ResolveMethod<UTxO>,
     lucid: Lucid
 ): Promise<ApplyInputsToContractRequest[]> {
@@ -67,10 +66,9 @@ export async function getApplyInputs(
     try {
         priceMap = await setPriceMap(requests, resMethods, lucid);
     } catch (e) {
-        if (e instanceof FeedError)
-            feedLogger.error(e.name, e.message);
+        if (e instanceof FeedError) feedLogger.error(e.name, e.message);
     }
-
+    const mosAddress = await lucid.wallet.address();
     const feeds = requests.map(async (request) => {
         const [input, utxo] = await feed(request, priceMap);
         const air: ApplyInputsToContractRequest = {
@@ -131,8 +129,7 @@ async function feed(
 
         const pm = priceMap[cn];
 
-        if (isNone(pm))
-            throw new FeedError('PriceUndefinedForChoiceName');
+        if (isNone(pm)) throw new FeedError('PriceUndefinedForChoiceName');
 
         const [price, utxo] = pm.value;
 
@@ -302,13 +299,10 @@ async function setPriceMap(
                     break;
             }
         } catch (e) {
-            if (e instanceof FeedError)
-                feedLogger.error(e.name, e.message);
+            if (e instanceof FeedError) feedLogger.error(e.name, e.message);
         }
-        if (price && utxo)
-            priceMap[cn] = some([price, utxo]);
-        else
-            priceMap[cn] = none;
+        if (price && utxo) priceMap[cn] = some([price, utxo]);
+        else priceMap[cn] = none;
     }
 
     return priceMap;
