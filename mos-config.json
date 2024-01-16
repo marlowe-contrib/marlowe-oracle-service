@@ -17,7 +17,19 @@
       },
       "bridgeAddress": "addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu",
       "feedAddress": "addr_test1wzn5ee2qaqvly3hx7e0nk3vhm240n5muq3plhjcnvx9ppjgf62u6a",
-      "feedAssetClass": "1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf074f7261636c6546656564"
+      "feedPolicyId": "1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf07",
+      "feedTokenName": "4f7261636c6546656564"
+    },
+    "orcfax" : {
+      "choiceNames": "Orcfax ADAUSD",
+      "roleNames": "Orcfax Oracle",
+      "bridgeValidatorUtxo": {
+        "txHash": "6d9ccb38415db7ac647d3b68098658f66dd392364a1ce42fede5a998187576b6",
+        "outputIndex": 0
+      },
+      "bridgeAddress": "addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu",
+      "feedAddress": "addr_test1wrtcecfy7np3sduzn99ffuv8qx2sa8v977l0xql8ca7lgkgmktuc0",
+      "feedPolicyId": "104d51dd927761bf5d50d32e1ede4b2cff477d475fe32f4f780a4b21"
     }
   }
 }

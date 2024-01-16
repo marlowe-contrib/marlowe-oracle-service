@@ -20,6 +20,8 @@ import { feedLogger } from './logger.ts';
 import { Constr, Data, Datum, Lucid, UTxO } from 'lucid-cardano';
 import { OracleConfig, ResolveMethod } from './config.ts';
 import { Option, isNone, none, some } from 'fp-ts/lib/Option.js';
+import { fromUnit } from 'lucid-cardano';
+import { toUnit } from 'lucid-cardano';
 
 type Currency = 'ADA' | 'USD';
 
@@ -321,7 +323,7 @@ async function getCharli3Price(
     const charli3Utxo = await lucid.utxosAt(c3Config.feedAddress);
 
     const feedUtxo = charli3Utxo.filter(
-        (utxo) => utxo.assets[c3Config.feedAssetClass] === 1n
+        (utxo) => utxo.assets[toUnit(c3Config.feedPolicyId, c3Config.feedTokenName)] === 1n
     );
 
     if (!feedUtxo[0]) throw new FeedError('UtxoWOracleFeedNotFound');

@@ -9,7 +9,6 @@ import {
     Maestro,
     Blockfrost,
     MaestroSupportedNetworks,
-    Unit,
     Lucid,
     UTxO,
     OutRef,
@@ -18,6 +17,7 @@ import {
 
 import { ConfigError } from './error.ts';
 import { configLogger } from './logger.ts';
+import { PolicyId } from 'marlowe-language-core-v1-txpipe';
 
 /**
  * Configuration for decentralized oracles method.
@@ -35,7 +35,8 @@ export type OracleConfig<T> = {
     bridgeValidatorUtxo: T;
     bridgeAddress: string;
     feedAddress: string;
-    feedAssetClass: Unit;
+    feedPolicyId: PolicyId;
+    feedTokenName: string | undefined;
 };
 
 /**
