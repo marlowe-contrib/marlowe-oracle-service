@@ -323,7 +323,10 @@ async function getCharli3Price(
     const charli3Utxo = await lucid.utxosAt(c3Config.feedAddress);
 
     const feedUtxo = charli3Utxo.filter(
-        (utxo) => utxo.assets[toUnit(c3Config.feedPolicyId, c3Config.feedTokenName)] === 1n
+        (utxo) =>
+            utxo.assets[
+                toUnit(c3Config.feedPolicyId, c3Config.feedTokenName)
+            ] === 1n
     );
 
     if (!feedUtxo[0]) throw new FeedError('UtxoWOracleFeedNotFound');
