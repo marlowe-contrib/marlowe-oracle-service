@@ -23,7 +23,7 @@ import { scanLogger } from './logger.ts';
 import axios, { AxiosError } from 'axios';
 import { RequestError, ScanError, throwAxiosError } from './error.ts';
 import { Lucid, UTxO, fromText, toUnit } from 'lucid-cardano';
-import { ResolveMethod } from './config.ts';
+import { OracleConfig, ResolveMethod } from './config.ts';
 
 /**
  * The t type contains the necessary information to identify an
@@ -119,7 +119,9 @@ export async function getActiveContracts(
 
     const addressResolvable: OracleRequest[] = [];
     const charli3ResolvableData: [CanChoose, ContractHeader][] = [];
-    const charli3Resolvable: OracleRequest[] = [];
+    let charli3Resolvable: OracleRequest[] = [];
+    const orcfaxResolvableData: [CanChoose, ContractHeader][] = [];
+    let orcfaxResolvable: OracleRequest[] = [];
 
     for (const contract of allContractHeaders) {
         const nextSteps = await client.getNextStepsForContract(
@@ -159,6 +161,15 @@ export async function getActiveContracts(
                         )
                     ) {
                         charli3ResolvableData.push([choice, contract]);
+                    } else if (
+                        methods.orcfax &&
+                        isResolvable(
+                            choice,
+                            { role_token: methods.orcfax.roleNames },
+                            [methods.orcfax.choiceNames]
+                        )
+                    ) {
+                        orcfaxResolvableData.push([choice, contract]);
                     }
                 });
             }
@@ -166,39 +177,21 @@ export async function getActiveContracts(
     }
 
     if (methods.charli3 && charli3ResolvableData.length > 0) {
-        const bridgeUtxos = await lucid.utxosAt(methods.charli3.bridgeAddress);
+        charli3Resolvable = await makeOracleRequests(
+            methods.charli3,
+            charli3ResolvableData,
+            [timeBefore5Minutes, timeAfter5Minutes],
+            lucid
+        );
+    }
 
-        for (const [choice, contract] of charli3ResolvableData) {
-            const roleMintingPolicy = unPolicyId(
-                contract.roleTokenMintingPolicyId
-            );
-
-            const assetClass = toUnit(
-                roleMintingPolicy,
-                fromText(methods.charli3.roleNames)
-            );
-
-            const utxo = bridgeUtxos.find(
-                (utxo) => utxo.assets[assetClass] === 1n
-            );
-
-            if (utxo) {
-                const newRequest: OracleRequest = {
-                    contractId: contract.contractId,
-                    choiceId: choice.for_choice,
-                    choiceBounds: choice.can_choose_between,
-                    invalidBefore: timeBefore5Minutes,
-                    invalidHereafter: timeAfter5Minutes,
-                    bridgeUtxo: some(utxo),
-                };
-                charli3Resolvable.push(newRequest);
-            } else {
-                scanLogger.debug(
-                    'No Bridge UTxO found for contract:',
-                    contract.contractId
-                );
-            }
-        }
+    if (methods.orcfax && orcfaxResolvableData.length > 0) {
+        orcfaxResolvable = await makeOracleRequests(
+            methods.orcfax,
+            orcfaxResolvableData,
+            [timeBefore5Minutes, timeAfter5Minutes],
+            lucid
+        );
     }
 
     scanLogger.info(
@@ -209,8 +202,12 @@ export async function getActiveContracts(
         'Charli3Resolvable: ',
         charli3Resolvable.map((elem) => elem.contractId)
     );
+    scanLogger.info(
+        'OrcfaxResolvable: ',
+        orcfaxResolvable.map((elem) => elem.contractId)
+    );
 
-    return addressResolvable.concat(charli3Resolvable);
+    return addressResolvable.concat(charli3Resolvable).concat(orcfaxResolvable);
 }
 
 /**
@@ -233,4 +230,43 @@ function isResolvable(
         partyCmp(choiceId.choice_owner, party) === 'EqualTo' &&
         validChoiceNames.includes(choiceId.choice_name)
     );
+}
+
+async function makeOracleRequests(
+    oracle: OracleConfig<UTxO>,
+    resolvableData: [CanChoose, ContractHeader][],
+    time: Date[],
+    lucid: Lucid
+): Promise<OracleRequest[]> {
+    const oracleResolvable: OracleRequest[] = [];
+    const bridgeUtxos = await lucid.utxosAt(oracle.bridgeAddress);
+
+    for (const [choice, contract] of resolvableData) {
+        const roleMintingPolicy = unPolicyId(contract.roleTokenMintingPolicyId);
+
+        const assetClass = toUnit(
+            roleMintingPolicy,
+            fromText(oracle.roleNames)
+        );
+
+        const utxo = bridgeUtxos.find((utxo) => utxo.assets[assetClass] === 1n);
+
+        if (utxo) {
+            const newRequest: OracleRequest = {
+                contractId: contract.contractId,
+                choiceId: choice.for_choice,
+                choiceBounds: choice.can_choose_between,
+                invalidBefore: time[0],
+                invalidHereafter: time[1],
+                bridgeUtxo: some(utxo),
+            };
+            oracleResolvable.push(newRequest);
+        } else {
+            scanLogger.debug(
+                'No Bridge UTxO found for contract:',
+                contract.contractId
+            );
+        }
+    }
+    return oracleResolvable;
 }
