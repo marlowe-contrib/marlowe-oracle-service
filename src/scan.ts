@@ -180,7 +180,6 @@ export async function getActiveContracts(
         charli3Resolvable = await makeOracleRequests(
             methods.charli3,
             charli3ResolvableData,
-            [timeBefore5Minutes, timeAfter5Minutes],
             lucid
         );
     }
@@ -189,7 +188,6 @@ export async function getActiveContracts(
         orcfaxResolvable = await makeOracleRequests(
             methods.orcfax,
             orcfaxResolvableData,
-            [timeBefore5Minutes, timeAfter5Minutes],
             lucid
         );
     }
@@ -232,14 +230,32 @@ function isResolvable(
     );
 }
 
+/**
+ * Given a list of possible contracts to resolve, check if the correct role
+ * token is present in the bridge address for each. Creates an Oracle Request
+ * for each valid contract.
+ * @param oracle OracleConfig to use
+ * @param resolvableData Contracts that request Input for this oracle
+ * @param lucid Lucid instance
+ * @returns a list of resolvable Oracle Requests
+ */
 async function makeOracleRequests(
     oracle: OracleConfig<UTxO>,
     resolvableData: [CanChoose, ContractHeader][],
-    time: Date[],
     lucid: Lucid
 ): Promise<OracleRequest[]> {
     const oracleResolvable: OracleRequest[] = [];
     const bridgeUtxos = await lucid.utxosAt(oracle.bridgeAddress);
+
+    const currentTime: Date = new Date();
+
+    const timeBefore5Minutes: Date = new Date(
+        currentTime.getTime() - 5 * 60 * 1000
+    );
+
+    const timeAfter5Minutes: Date = new Date(
+        currentTime.getTime() + 5 * 60 * 1000
+    );
 
     for (const [choice, contract] of resolvableData) {
         const roleMintingPolicy = unPolicyId(contract.roleTokenMintingPolicyId);
@@ -256,8 +272,8 @@ async function makeOracleRequests(
                 contractId: contract.contractId,
                 choiceId: choice.for_choice,
                 choiceBounds: choice.can_choose_between,
-                invalidBefore: time[0],
-                invalidHereafter: time[1],
+                invalidBefore: timeBefore5Minutes,
+                invalidHereafter: timeAfter5Minutes,
                 bridgeUtxo: some(utxo),
             };
             oracleResolvable.push(newRequest);
