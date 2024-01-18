@@ -203,15 +203,10 @@ async function getApplyRequests(
 
     let newTx = undefined;
 
-    //Hotfix for script evaluation error. Remove once MAS is updated
-    const oldIBUNIX = (request.invalidBefore as Date).getTime();
-    const newIBUNIX = Math.floor(oldIBUNIX / 1000) * 1000;
-    const newIB = new Date(newIBUNIX);
-
     const newRequest: MASRequest = {
         version: 'v1',
         marloweData: utxo.datum,
-        invalidBefore: newIB,
+        invalidBefore: request.invalidBefore,
         invalidHereafter: request.invalidHereafter,
         inputs: request.inputs,
     };
@@ -232,7 +227,7 @@ async function getApplyRequests(
             newTx.addSigner(address);
         }
 
-        newTx.validFrom(newIBUNIX);
+        newTx.validFrom(request.invalidBefore.getTime());
         newTx.validTo(request.invalidHereafter.getTime());
 
         newTx.collectFrom([utxo], applyResponse.redeemerCborHex);
