@@ -2,6 +2,7 @@ import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
 import {
     Address,
     Assets,
+    Blockfrost,
     C,
     Constr,
     Data,
@@ -400,7 +401,12 @@ async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
             const external: ExternalWallet = { address: address, utxos: utxos };
             lucid.selectWalletFrom(external);
 
-            const completedTx = await tx.complete({ nativeUplc: true });
+            // If we have blockfrost as a provider, we can use it for uplc
+            const usingBlockfrost = lucid.provider instanceof Blockfrost;
+            const completedTx = await tx.complete({
+                nativeUplc: !usingBlockfrost,
+            });
+
             completedTxs.push(completedTx);
 
             const usedUtxos = completedTx.txComplete.body().inputs();
