@@ -392,11 +392,11 @@ async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
     const wallet = lucid.wallet;
     let completedTxs: TxComplete[] = [];
 
-    try {
-        const address = await wallet.address();
-        let utxos = await wallet.getUtxos();
+    const address = await wallet.address();
+    let utxos = await wallet.getUtxos();
 
-        for (var tx of txs) {
+    for (var tx of txs) {
+        try {
             const external: ExternalWallet = { address: address, utxos: utxos };
             lucid.selectWalletFrom(external);
 
@@ -411,13 +411,12 @@ async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
                 };
                 return !isIncluded(ref, usedUtxos);
             });
+        } catch (err) {
+            txLogger.error(err);
         }
-    } catch (err) {
-        txLogger.error(err);
-    } finally {
-        lucid.wallet = wallet;
-        return completedTxs;
     }
+    lucid.wallet = wallet;
+    return completedTxs;
 }
 
 /**
