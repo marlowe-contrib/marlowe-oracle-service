@@ -9,7 +9,6 @@ import {
     Maestro,
     Blockfrost,
     MaestroSupportedNetworks,
-    Unit,
     Lucid,
     UTxO,
     OutRef,
@@ -18,6 +17,7 @@ import {
 
 import { ConfigError } from './error.ts';
 import { configLogger } from './logger.ts';
+import { PolicyId } from 'marlowe-language-core-v1-txpipe';
 
 /**
  * Configuration for decentralized oracles method.
@@ -35,7 +35,8 @@ export type OracleConfig<T> = {
     bridgeValidatorUtxo: T;
     bridgeAddress: string;
     feedAddress: string;
-    feedAssetClass: Unit;
+    feedPolicyId: PolicyId;
+    feedTokenName: string | undefined;
 };
 
 /**
@@ -53,6 +54,7 @@ export type AddressConfig = {
 export type ResolveMethod<T> = {
     address: AddressConfig | undefined;
     charli3: OracleConfig<T> | undefined;
+    orcfax: OracleConfig<T> | undefined;
 };
 
 /**
@@ -322,23 +324,41 @@ export async function setOracleConfig(
     mc: MOSConfig<OutRef>,
     lucid: Lucid
 ): Promise<MOSConfig<UTxO>> {
+    let charli3BridgeUtxo;
+    let orcfaxBridgeUtxo;
     if (mc.resolveMethod.charli3) {
-        const bridgeUtxo: UTxO = await getUTxOWithScriptRef(
+        charli3BridgeUtxo = await getUTxOWithScriptRef(
             lucid,
             mc.resolveMethod.charli3.bridgeValidatorUtxo,
             mc.resolveMethod.charli3.bridgeAddress
         );
-
+    }
+    if (mc.resolveMethod.orcfax) {
+        orcfaxBridgeUtxo = await getUTxOWithScriptRef(
+            lucid,
+            mc.resolveMethod.orcfax.bridgeValidatorUtxo,
+            mc.resolveMethod.orcfax.bridgeAddress
+        );
+    }
+    if (charli3BridgeUtxo || orcfaxBridgeUtxo) {
         return {
             ...mc,
             resolveMethod: {
                 ...mc.resolveMethod,
-                charli3: {
-                    ...mc.resolveMethod.charli3,
-                    bridgeValidatorUtxo: bridgeUtxo,
-                },
+                ...(mc.resolveMethod.charli3 && {
+                    charli3: {
+                        ...mc.resolveMethod.charli3,
+                        bridgeValidatorUtxo: charli3BridgeUtxo,
+                    },
+                }),
+                ...(mc.resolveMethod.orcfax && {
+                    orcfax: {
+                        ...mc.resolveMethod.orcfax,
+                        bridgeValidatorUtxo: orcfaxBridgeUtxo,
+                    },
+                }),
             },
-        };
+        } as MOSConfig<UTxO>;
     } else {
         return mc as MOSConfig<UTxO>;
     }
