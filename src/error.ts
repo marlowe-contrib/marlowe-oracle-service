@@ -72,7 +72,11 @@ type FeedErrorNames =
     | 'UnexpectedCharli3DatumShape'
     | 'Charli3PriceExpired'
     | 'FoundRequestForCharli3FeedButConfigurationNotSet'
-    | 'FailedSettingPriceMap';
+    | 'FailedSettingPriceMap'
+    | 'FoundRequestForOrcfaxFeedButConfigurationNotSet'
+    | 'UnexpectedOrcfaxDatumShape'
+    | 'OrcfaxPriceExpired'
+    | 'NoUtxosFoundWithOrcfaxFeedPolicyId';
 
 /**
  * Errors from the tx module.

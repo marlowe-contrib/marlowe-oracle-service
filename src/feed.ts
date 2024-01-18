@@ -14,14 +14,24 @@ import {
     ChosenNum,
 } from 'marlowe-language-core-v1-txpipe';
 
+import {
+    Constr,
+    Data,
+    Datum,
+    Lucid,
+    UTxO,
+    fromText,
+    fromUnit,
+    toUnit,
+} from 'lucid-cardano';
+
+import { Option, fold, isNone, none, some } from 'fp-ts/lib/Option.js';
+import { pipe } from 'fp-ts/lib/function.js';
+
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
 import { feedLogger } from './logger.ts';
-import { Constr, Data, Datum, Lucid, UTxO } from 'lucid-cardano';
 import { OracleConfig, ResolveMethod } from './config.ts';
-import { Option, isNone, none, some } from 'fp-ts/lib/Option.js';
-import { fromUnit } from 'lucid-cardano';
-import { toUnit } from 'lucid-cardano';
 
 type Currency = 'ADA' | 'USD';
 
@@ -49,7 +59,8 @@ export type ApplyInputsToContractRequest = {
 const KnownCurrencyPairs = new Map([
     ['Coingecko ADAUSD', { source: 'Coingecko', from: 'ADA', to: 'USD' }],
     ['Coingecko USDADA', { source: 'Coingecko', from: 'USD', to: 'ADA' }],
-    ['Charli3 ADAUSD', { source: 'Charli3', from: 'USD', to: 'ADA' }],
+    ['Charli3 ADAUSD', { source: 'Charli3', from: 'ADA', to: 'USD' }],
+    ['Orcfax ADAUSD', { source: 'Orcfax', from: 'ADA', to: 'USD' }],
 ]);
 
 /**
@@ -299,6 +310,16 @@ async function setPriceMap(
                         lucid
                     );
                     break;
+                case 'Orcfax':
+                    if (!resMethods.orcfax)
+                        throw new FeedError(
+                            'FoundRequestForOrcfaxFeedButConfigurationNotSet'
+                        );
+                    [price, utxo] = await getOrcfaxPrice(
+                        resMethods.orcfax,
+                        lucid
+                    );
+                    break;
             }
         } catch (e) {
             if (e instanceof FeedError) feedLogger.error(e.name, e.message);
@@ -364,5 +385,112 @@ function parseCharli3Price(datum: Datum): bigint {
         }
     } else {
         throw new FeedError('UnexpectedCharli3DatumShape');
+    }
+}
+
+export async function getOrcfaxPrice(
+    ofConfig: OracleConfig<UTxO>,
+    lucid: Lucid
+): Promise<[bigint, Option<UTxO>]> {
+    const orcFaxUtxos = await lucid.utxosAt(ofConfig.feedAddress);
+
+    const feedUtxos = orcFaxUtxos.filter(
+        (utxo) =>
+            Object.entries(utxo.assets).filter(
+                ([u, v]) =>
+                    fromUnit(u).policyId === ofConfig.feedPolicyId && v === 1n
+            ).length > 0
+    );
+
+    if (feedUtxos.length === 0)
+        throw new FeedError('NoUtxosFoundWithOrcfaxFeedPolicyId');
+
+    let newestUTxOWithTime: [Option<[UTxO, Datum]>, bigint] = [none, 0n];
+
+    const currentTime = new Date();
+
+    for (const utxo of feedUtxos) {
+        try {
+            if (utxo.datum) {
+                const vTimes = parseOrcfaxValidTime(utxo.datum);
+                if (currentTime.getTime() < vTimes.validThrough)
+                    throw new FeedError('OrcfaxPriceExpired');
+                if (vTimes.validFrom > newestUTxOWithTime[1]) {
+                    newestUTxOWithTime = [
+                        some([utxo, utxo.datum]),
+                        vTimes.validFrom,
+                    ];
+                }
+            }
+        } catch (e) {
+            if (e instanceof FeedError) feedLogger.error(e.name, e.message);
+        }
+    }
+
+    return pipe(
+        newestUTxOWithTime[0],
+        fold(
+            () => {
+                throw new FeedError('UtxoWOracleFeedNotFound');
+            }, // Check if this is the correct error .. Maybe UTxO w valid oracle feed not found
+            (result) => [parseOrcfaxPrice(result[1]), some(result[0])]
+        )
+    );
+}
+
+function parseOrcfaxPrice(raw_datum: Datum): bigint {
+    let data = Data.from<Data>(raw_datum);
+
+    if (data instanceof Constr && data.index === 0) {
+        let data2 = data.fields[0];
+        if (data2 instanceof Map) {
+            let data3 = data2.get(fromText('value'));
+            if (data3 instanceof Array) {
+                let data4 = data3[0];
+                if (data4 instanceof Constr && data4.index === 3) {
+                    let data5 = data4.fields;
+                    return data5[0] as bigint;
+                } else {
+                    throw new FeedError('UnexpectedOrcfaxDatumShape');
+                }
+            } else {
+                throw new FeedError('UnexpectedOrcfaxDatumShape');
+            }
+        } else {
+            throw new FeedError('UnexpectedOrcfaxDatumShape');
+        }
+    } else {
+        throw new FeedError('UnexpectedOrcfaxDatumShape');
+    }
+}
+
+function parseOrcfaxValidTime(raw_datum: Datum): {
+    validFrom: bigint;
+    validThrough: bigint;
+} {
+    let data = Data.from<Data>(raw_datum);
+    if (data instanceof Constr && data.index === 0) {
+        let data2 = data.fields[0];
+        if (data2 instanceof Map) {
+            let data3 = data2.get(fromText('valueReference'));
+            if (data3 instanceof Array) {
+                let data4 = data3[0];
+                let data5 = data3[1];
+                if (data4 instanceof Map && data5 instanceof Map) {
+                    return {
+                        validFrom: data4.get(fromText('value')) as bigint,
+                        validThrough: data5.get(fromText('value')) as bigint,
+                    };
+                } else {
+                    throw new FeedError('UnexpectedOrcfaxDatumShape');
+                }
+            } else {
+                throw new FeedError('UnexpectedOrcfaxDatumShape');
+            }
+        } else {
+            throw new FeedError('UnexpectedOrcfaxDatumShape');
+        }
+    } else {
+        throw new FeedError('UnexpectedOrcfaxDatumShape');
     }
 }
