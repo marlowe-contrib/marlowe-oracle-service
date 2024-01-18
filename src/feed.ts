@@ -17,11 +17,9 @@ import {
 import { OracleRequest } from './scan.ts';
 import { FeedError, RequestError } from './error.ts';
 import { feedLogger } from './logger.ts';
-import { Constr, Data, Datum, Lucid, UTxO } from 'lucid-cardano';
+import { Constr, Data, Datum, Lucid, UTxO, toUnit } from 'lucid-cardano';
 import { OracleConfig, ResolveMethod } from './config.ts';
 import { Option, isNone, none, some } from 'fp-ts/lib/Option.js';
-import { fromUnit } from 'lucid-cardano';
-import { toUnit } from 'lucid-cardano';
 
 type Currency = 'ADA' | 'USD';
 
@@ -320,22 +318,16 @@ async function getCharli3Price(
     c3Config: OracleConfig<UTxO>,
     lucid: Lucid
 ): Promise<[bigint, Option<UTxO>]> {
-    const charli3Utxo = await lucid.utxosAt(c3Config.feedAddress);
+    const charli3Unit = toUnit(c3Config.feedPolicyId, c3Config.feedTokenName);
+    const charli3Utxo = await lucid.utxoByUnit(charli3Unit);
 
-    const feedUtxo = charli3Utxo.filter(
-        (utxo) =>
-            utxo.assets[
-                toUnit(c3Config.feedPolicyId, c3Config.feedTokenName)
-            ] === 1n
-    );
-
-    if (!feedUtxo[0]) throw new FeedError('UtxoWOracleFeedNotFound');
-    if (!feedUtxo[0].datum)
+    if (!charli3Utxo) throw new FeedError('UtxoWOracleFeedNotFound');
+    if (!charli3Utxo.datum)
         throw new FeedError('UtxoWOracleFeedDoesNotHaveDatum');
 
-    const price: bigint = parseCharli3Price(feedUtxo[0].datum);
+    const price: bigint = parseCharli3Price(charli3Utxo.datum);
 
-    return [price, some(feedUtxo[0])];
+    return [price, some(charli3Utxo)];
 }
 
 /**
