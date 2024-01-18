@@ -388,6 +388,15 @@ function parseCharli3Price(datum: Datum): bigint {
     }
 }
 
+/**
+ * Queries the Orcfax Address for the feed UTxOs, looks for the most recent, and
+ * returns that utxo and the price it informs.
+ * @param ofConfig OracleConfig with the necessary information to query for the
+ * Orcfax ADAUSD feed.
+ * @param lucid Lucid instance used to query the blockchain
+ * @returns The most recent price informed by Orcfax, and the UTxO from which
+ * this information is obtained.
+ */
 export async function getOrcfaxPrice(
     ofConfig: OracleConfig<UTxO>,
     lucid: Lucid
@@ -422,9 +431,7 @@ export async function getOrcfaxPrice(
                     ];
                 }
             }
-        } catch (e) {
-            if (e instanceof FeedError) feedLogger.error(e.name, e.message);
-        }
+        } catch (e) {}
     }
 
     return pipe(
@@ -432,12 +439,17 @@ export async function getOrcfaxPrice(
         fold(
             () => {
                 throw new FeedError('UtxoWOracleFeedNotFound');
-            }, // Check if this is the correct error .. Maybe UTxO w valid oracle feed not found
+            },
             (result) => [parseOrcfaxPrice(result[1]), some(result[0])]
         )
     );
 }
 
+/**
+ * Utility to parse the Orcfax Feed Datum to obtain the price
+ * @param raw_datum Datum of the Orcfax Feed datum
+ * @returns Exchange rate for ADAUSD
+ */
 function parseOrcfaxPrice(raw_datum: Datum): bigint {
     let data = Data.from<Data>(raw_datum);
 
@@ -464,6 +476,12 @@ function parseOrcfaxPrice(raw_datum: Datum): bigint {
     }
 }
 
+/**
+ * Utility to parse the Orcfax feed UTxO's datum to obtain the validity interval
+ * of the price it informs.
+ * @param raw_datum Datum of the Orcfax feed UTxO
+ * @returns The timestamps the mark the validity interval of the price.
+ */
 function parseOrcfaxValidTime(raw_datum: Datum): {
     validFrom: bigint;
     validThrough: bigint;
