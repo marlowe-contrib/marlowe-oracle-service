@@ -34,7 +34,7 @@ const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
 lucid.selectWalletFromPrivateKey(mosEnv.signingKey);
 
 let args = '';
-let tag = '';
+let tag = 'requires.marlowe.oracle.test.alpha.1';
 const program = new Command();
 program
     .showHelpAfterError()
