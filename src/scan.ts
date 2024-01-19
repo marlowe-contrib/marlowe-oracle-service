@@ -78,8 +78,9 @@ async function getAllContracts(
  * name is a valid choice name
  *
  * @param client The Marlowe-ts rest client to make the neccesary queries
- * @param mosAddress The address of the MOS
- * @param validChoiceNames Choice names that the MOS knows how to resolve
+ * @param lucid Lucid instance
+ * @param methods Resolve methods to be used
+ * @param tags Marlowe tags to filter contracts by
  * @returns a list of request for the MOS to resolve
  */
 export async function getActiveContracts(
@@ -156,8 +157,8 @@ export async function getActiveContracts(
                         methods.charli3 &&
                         isResolvable(
                             choice,
-                            { role_token: methods.charli3.roleNames },
-                            [methods.charli3.choiceNames]
+                            { role_token: methods.charli3.roleName },
+                            [methods.charli3.choiceName]
                         )
                     ) {
                         charli3ResolvableData.push([choice, contract]);
@@ -165,8 +166,8 @@ export async function getActiveContracts(
                         methods.orcfax &&
                         isResolvable(
                             choice,
-                            { role_token: methods.orcfax.roleNames },
-                            [methods.orcfax.choiceNames]
+                            { role_token: methods.orcfax.roleName },
+                            [methods.orcfax.choiceName]
                         )
                     ) {
                         orcfaxResolvableData.push([choice, contract]);
@@ -260,10 +261,7 @@ async function makeOracleRequests(
     for (const [choice, contract] of resolvableData) {
         const roleMintingPolicy = unPolicyId(contract.roleTokenMintingPolicyId);
 
-        const assetClass = toUnit(
-            roleMintingPolicy,
-            fromText(oracle.roleNames)
-        );
+        const assetClass = toUnit(roleMintingPolicy, fromText(oracle.roleName));
 
         const utxo = bridgeUtxos.find((utxo) => utxo.assets[assetClass] === 1n);
 

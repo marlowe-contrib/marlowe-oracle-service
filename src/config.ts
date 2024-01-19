@@ -22,16 +22,16 @@ import { PolicyId } from 'marlowe-language-core-v1-txpipe';
 /**
  * Configuration for decentralized oracles method.
  * Includes:
- * - ChoiceNames it resolves,
- * - RoleNames it answers to,
+ * - ChoiceName it resolves,
+ * - RoleName it answers to,
  * - the UTxO Ref of the  Bridge validator
  * - the address of the Bridge validator
  * - the address of the decentralized oracle's feed
  * - the asset class of the token that identifies the dec oracle feed UTx0.
  */
 export type OracleConfig<T> = {
-    choiceNames: ChoiceName;
-    roleNames: string;
+    choiceName: ChoiceName;
+    roleName: string;
     bridgeValidatorUtxo: T;
     bridgeAddress: string;
     feedAddress: string;

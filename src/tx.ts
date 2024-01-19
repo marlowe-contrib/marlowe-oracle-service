@@ -2,6 +2,7 @@ import { RestClient } from 'marlowe-runtime-rest-client-txpipe';
 import {
     Address,
     Assets,
+    Blockfrost,
     C,
     Constr,
     Data,
@@ -202,15 +203,10 @@ async function getApplyRequests(
 
     let newTx = undefined;
 
-    //Hotfix for script evaluation error. Remove once MAS is updated
-    const oldIBUNIX = (request.invalidBefore as Date).getTime();
-    const newIBUNIX = Math.floor(oldIBUNIX / 1000) * 1000;
-    const newIB = new Date(newIBUNIX);
-
     const newRequest: MASRequest = {
         version: 'v1',
         marloweData: utxo.datum,
-        invalidBefore: newIB,
+        invalidBefore: request.invalidBefore,
         invalidHereafter: request.invalidHereafter,
         inputs: request.inputs,
     };
@@ -231,7 +227,7 @@ async function getApplyRequests(
             newTx.addSigner(address);
         }
 
-        newTx.validFrom(newIBUNIX);
+        newTx.validFrom(request.invalidBefore.getTime());
         newTx.validTo(request.invalidHereafter.getTime());
 
         newTx.collectFrom([utxo], applyResponse.redeemerCborHex);
@@ -392,15 +388,20 @@ async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
     const wallet = lucid.wallet;
     let completedTxs: TxComplete[] = [];
 
-    try {
-        const address = await wallet.address();
-        let utxos = await wallet.getUtxos();
+    const address = await wallet.address();
+    let utxos = await wallet.getUtxos();
 
-        for (var tx of txs) {
+    for (var tx of txs) {
+        try {
             const external: ExternalWallet = { address: address, utxos: utxos };
             lucid.selectWalletFrom(external);
 
-            const completedTx = await tx.complete({ nativeUplc: true });
+            // If we have blockfrost as a provider, we can use it for uplc
+            const usingBlockfrost = lucid.provider instanceof Blockfrost;
+            const completedTx = await tx.complete({
+                nativeUplc: !usingBlockfrost,
+            });
+
             completedTxs.push(completedTx);
 
             const usedUtxos = completedTx.txComplete.body().inputs();
@@ -411,13 +412,12 @@ async function balanceParallel(txs: Tx[], lucid: Lucid): Promise<TxComplete[]> {
                 };
                 return !isIncluded(ref, usedUtxos);
             });
+        } catch (err) {
+            txLogger.error(err);
         }
-    } catch (err) {
-        txLogger.error(err);
-    } finally {
-        lucid.wallet = wallet;
-        return completedTxs;
     }
+    lucid.wallet = wallet;
+    return completedTxs;
 }
 
 /**
