@@ -9,8 +9,8 @@
       "choiceNames":[ "Coingecko ADAUSD" ]
       },
     "charli3" : {
-      "choiceNames": "Charli3 ADAUSD",
-      "roleNames": "Charli3 Oracle",
+      "choiceName": "Charli3 ADAUSD",
+      "roleName": "Charli3 Oracle",
       "bridgeValidatorUtxo": {
         "txHash": "6d9ccb38415db7ac647d3b68098658f66dd392364a1ce42fede5a998187576b6",
         "outputIndex": 0
@@ -21,8 +21,8 @@
       "feedTokenName": "4f7261636c6546656564"
     },
     "orcfax" : {
-      "choiceNames": "Orcfax ADAUSD",
-      "roleNames": "Orcfax Oracle",
+      "choiceName": "Orcfax ADAUSD",
+      "roleName": "Orcfax Oracle",
       "bridgeValidatorUtxo": {
         "txHash": "6d9ccb38415db7ac647d3b68098658f66dd392364a1ce42fede5a998187576b6",
         "outputIndex": 0
