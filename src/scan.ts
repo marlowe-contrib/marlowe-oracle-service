@@ -78,8 +78,9 @@ async function getAllContracts(
  * name is a valid choice name
  *
  * @param client The Marlowe-ts rest client to make the neccesary queries
- * @param mosAddress The address of the MOS
- * @param validChoiceNames Choice names that the MOS knows how to resolve
+ * @param lucid Lucid instance
+ * @param methods Resolve methods to be used
+ * @param tags Marlowe tags to filter contracts by
  * @returns a list of request for the MOS to resolve
  */
 export async function getActiveContracts(
