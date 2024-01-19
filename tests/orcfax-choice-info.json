@@ -1,0 +1,9 @@
+{
+    "for_choice": {
+        "choice_owner": {
+            "role_token": "Orcfax Oracle"
+        },
+        "choice_name": "Orcfax ADAUSD"
+    },
+    "choose_between": [{ "from": 100, "to": 100000000000 }]
+}
