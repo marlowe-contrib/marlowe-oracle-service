@@ -422,9 +422,10 @@ export async function getOrcfaxPrice(
         try {
             if (utxo.datum) {
                 const vTimes = parseOrcfaxValidTime(utxo.datum);
-                if (currentTime.getTime() > vTimes.validThrough)
-                    throw new FeedError('OrcfaxPriceExpired');
-                if (vTimes.validFrom > newestUTxOWithTime[1]) {
+                if (
+                    currentTime.getTime() < vTimes.validThrough &&
+                    vTimes.validFrom > newestUTxOWithTime[1]
+                ) {
                     newestUTxOWithTime = [
                         some([utxo, utxo.datum]),
                         vTimes.validFrom,
