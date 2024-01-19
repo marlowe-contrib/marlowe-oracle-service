@@ -119,7 +119,7 @@ The choice owner should be the oracle service's address or the role name, and th
 ```
 
 There's also an optional cli parameter to specify the marlowe tag to use. If not specified, it will use the default value of `requires.marlowe.oracle.test.alpha.1`.
-The complete command to deploy a marlowe contract, requesting charli3 oracle data wpuld be:
+The complete command to deploy a marlowe contract, requesting charli3 oracle data would be:
 
 ```bash
 npm run deploy-example -- tests/charli3-choice-info.json requires.marlowe.oracle.test.alpha.2
