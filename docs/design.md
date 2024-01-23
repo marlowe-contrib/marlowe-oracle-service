@@ -23,11 +23,13 @@ Once a deployed Marlowe contract reaches the point where information from an Ora
 As explained in the last section, in Marlowe, a **Choice** action is used to request outside data, and using a specific combination of name and owner it can be stated that the data should be coming from an Oracle.
 
 A choice action has 3 parameters:
+
 - Choice Name: a string identifying this particular choice. It will be used in the rest of the contract to access the data of the Oracle.
 - Choice Owner: indicates who can resolve the choice. There are two options: **Address** or **Role**.
 - Choice Bounds: a list of closed intervals of integers. The provided number must lie inside any of them.
 
 For the contract to continue, a valid transaction must be submitted. The transaction must consume the contract UTxO and provide, in the redeemer, the ChoiceID and the information (that must be a number) to resolve the choice using the correct format. The Marlowe validator will do the following checks:
+
 - The choice owner is involved in the transaction. If the owner was specified as an **Address**, that address must sign the transaction, on the other hand, if it was specified using a **Role**, the corresponding role token must be included in an input of the transaction.
 - The information provided is between at least one of the bounds.
 - The state is updated appropriately. This means a new entry is added to the **choices** map with the ChoiceID as the key and the information as the value.
@@ -46,6 +48,7 @@ The feeds the MOS initially supports are exchange rate prices (the only currentl
 ### 3.1 Off-chain backend
 
 The Marlowe Oracle Service will use the Marlowe Runtime service to get a list of active Marlowe contracts. Then, it will filter only the contracts that pass the following criteria:
+
 - It has a choice action that can be resolved.
 - The choice name is a valid feed name that the service knows how to provide.
 -The owner is either the service’s address or a role token.
@@ -66,6 +69,7 @@ The resulting transaction should follow this specification (Ignoring Cardano fee
 *The specification of a transaction using only the address and no bridge validator.*
 
 #### Role token choice owner
+
 For contracts that want to utilize decentralized oracles like Charli3 or Orcfax, it first needs to check if the role token is present at a UTxO of the bridge validator. Then, it needs to include in the transaction the bridge UTxO and the Oracle Feed UTxO as a reference input.
 This is the adjusted flow diagram for the case in which the choice owner is determined by a role token.
 
@@ -79,6 +83,7 @@ The transaction will then follow this second specification (Ignoring Cardano fee
 *The specification of a transaction using a role token, the bridge validator, and the oracle feed.*
 
 ### 3.2 Charli3 and Orfax datum format
+
 Clearly, the off-chain backend needs to be able to read the Oracle Feed UTxO’s datum to get the feed information that will be used as input for the Marlowe contract. The MOS knows how to read Charli3 and Orcfax feeds.
 
 The Charli3 feed is well-specified by a CDDL [^1], and it has a lot of flexibility. For our particular case, the relevant information is placed on a map, defined as price_map, and the important keys are `0`, `1`, and `2`. Representing the price, the creation time, and the expiration time, respectively. For example, here we have an extract of the CDDL specification.
@@ -132,40 +137,62 @@ The price value format is expressed using scientific notation, so the price is s
 
 ### 3.3 Oracle Bridge Validator
 
-The bridge validator will have the responsibility to ensure that decentralized oracles are used effectively when a Marlowe contract requires it. It will have the following parameters:
-1. The hash of the Marlowe validator
-2. The currency symbol for the token held in the oracle's reference UTxO.
-3. The token name for the token held in the oracle's reference UTxO.
-4. The name of the Marlowe Choice where the Marlowe contract will receive oracle input.
+The bridge validator will have the responsibility to ensure that decentralized oracles are used effectively when a Marlowe contract requires it. There will be two validators, one meant for Charli3 and other for Orcfax (And most probably other COOP oracles). They take different parameters but make the same validations.
 
-Meaning that we can complete the parameters to calculate the address of the bridge validator for each oracle feed that we want to validate. Then, for each Marlowe contract that wants to make use of the bridge validator, a new UTxO at that address will need to be created, containing the role token and with a reference (contained in the datum) to the thread token that the Marlowe contract needs to have. Both tokens will have the same policyID and will be used to make a handshake between validators. (Only one instance of the bridge script can fill each Marlowe contract and only one Marlowe contract can use each instance of the bridge script)
+The validator for the Charli3 Oracle bridge will have the following parameters:
 
-The bridge validator will perform the following validations:
+1. The address of the Marlowe validator
+2. The address of the Charli3 feed
+3. The asset class for the token held in the oracle's reference UTxO
+4. The name of the Marlowe choice where the Marlowe contract will receive oracle input
+
+The validator for the Orcfax bridge is very similar but instead of taking an entire asset class it only takes the Policy Id that identifies the Orcfax feed . As a consequence, the parameters will look like this:
+
+1. The address of the Marlowe validator
+2. The address of the Orcfax feed
+3. The minting policy for the token held in the oracle's reference UTxO
+4. The name of the Marlowe choice where the Marlowe contract will receive oracle input
+
+Meaning that we can complete the parameters to calculate the address of the bridge validator for each oracle feed that we want to validate. Then, for each Marlowe contract that wants to make use of the bridge validator, a new UTxO at that address will need to be created, containing the role token in the value and, in the datum, the name of the thread token that the Marlowe contract needs to have and the pubkey hash of the “owner” of this instance. The owner will be able to close the instance using a specific redeemer.
+
+Both the thread and the role tokens will have the same policyID and will be used to make a handshake between validators. (Only one instance of the bridge script can fill each Marlowe contract and only one Marlowe contract can use each instance of the bridge script).
+
+The redeemer will be a Boolean that will be used to decide if the Marlowe choice should be validated or if the Bridge instance should be closed.
+
+The bridge validator will perform the following validations if the redeemer is True:
+
 - The datum of the continuing output doesn’t change
 - The value of the continuing output doesn’t change
 - Exactly one oracle feed UTxO is included as a reference input
 - Exactly one non-ada token is present at the bridge script UTxO. (It is assumed to be the role token)
-- There is a Marlowe contract at the inputs (If there are multiple, the first one is used)
+- There is exactly one Marlowe contract at the inputs
 - The Marlowe contract has the corresponding thread token
 - The Marlowe contract has a redeemer that resolves a choice action with the following format:
-    - The choice name matches the Oracle feed name
-    - The choice owner is a role token and matches the role token at the bridge UTxO
-    - The choice value matches the oracle value
+  - The choice name matches the Oracle feed name
+  - The choice owner is a role token and matches the role token at the bridge UTxO
+  - The choice value matches the oracle value
+
+On the other hand, if the redeemer is False, this validations are run:
+
+- The pubkey hash contained in the datum is signing the transaction
+- No marlowe contract input is present
+- All non-ada tokens in the bridge UTxO are burnt
 
 ## Appendix
+
 The following transactions demonstrate the different flows when using an oracle service with a Marlowe contract:
 
 Example one:
-https://preprod.cexplorer.io/tx/27c999650eae72dc12547a5896ffe1dbcb2dd5f9ec72178b6f7778c408d12e90
+<https://preprod.cexplorer.io/tx/27c999650eae72dc12547a5896ffe1dbcb2dd5f9ec72178b6f7778c408d12e90>
 In this example, we can see a contract that requests input from an oracle, that reports the appropriate value by passing it as a redeemer of the Marlowe contract.
 
 Example two:
-https://cexplorer.io/tx/7c51f613cdf181fda2967847eb39b2d42a41eafa9f4e45c6869362590c575548 
+<https://cexplorer.io/tx/7c51f613cdf181fda2967847eb39b2d42a41eafa9f4e45c6869362590c575548>
 This example showcases the more complex flow of using a decentralized oracle since it includes running another validation through the Oracle Bridge.
 
-[^1]: https://github.com/Charli3-Official/oracle-datum-lib/blob/main/spec.cddl
-[^2]: https://docs.orcfax.io/consume#read-cbor-datum-on-chain
-[^3]: https://github.com/orcfax/datum-demo
-[^4]: https://github.com/input-output-hk/marlowe-plutus/blob/main/marlowe-plutus/charli3.md
-[^5]: https://cexplorer.io/datum/7ec270f971d03f084c1c198a4f99e53dc8519430dcf4123d65b9e1c48fedd82e
-[^6]: https://cexplorer.io/datum/9e337356f507cd6c0c81f465a6b949b6a0007fc372784468a39dccabc739e1c2
+[^1]: <https://github.com/Charli3-Official/oracle-datum-lib/blob/main/spec.cddl>
+[^2]: <https://docs.orcfax.io/consume#read-cbor-datum-on-chain>
+[^3]: <https://github.com/orcfax/datum-demo>
+[^4]: <https://github.com/input-output-hk/marlowe-plutus/blob/main/marlowe-plutus/charli3.md>
+[^5]: <https://cexplorer.io/datum/7ec270f971d03f084c1c198a4f99e53dc8519430dcf4123d65b9e1c48fedd82e>
+[^6]: <https://cexplorer.io/datum/9e337356f507cd6c0c81f465a6b949b6a0007fc372784468a39dccabc739e1c2>
