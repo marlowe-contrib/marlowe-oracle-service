@@ -1,8 +1,26 @@
 use aiken/transaction.{ScriptContext}
-use on-chain-bridge/types
+use aiken/transaction/credential.{Address}
+use aiken/transaction/value.{AssetName, PolicyId}
 
-validator {
-  fn spend(datum: types.Datum, _redeemer: Data, _ctx: ScriptContext) -> Bool {
-    datum.message == "Hello World!"
+validator(
+  marloweAddress: Address,
+  charli3Address: Address,
+  charli3PolicyId: PolicyId,
+  charli3TokenName: AssetName,
+  choiceName: ByteArray,
+) {
+  fn charli3_bridge(datum: Data, redeemer: Data, ctx: ScriptContext) -> Bool {
+    True
+  }
+}
+
+validator(
+  marloweAddress: Address,
+  orcfaxAddress: Address,
+  orcfaxPolicyId: PolicyId,
+  choiceName: ByteArray,
+) {
+  fn orcfax_bridge(datum: Data, redeemer: Data, ctx: ScriptContext) -> Bool {
+    True
   }
 }
