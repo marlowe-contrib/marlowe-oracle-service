@@ -4,51 +4,51 @@ use aiken/transaction/value.{AssetName, PolicyId}
 use types.{AssetClass, ChoiceDict}
 
 pub fn lookup_and_check_bridge(
-  ctx: ScriptContext,
+  _ctx: ScriptContext,
 ) -> Option<(Output, Output, AssetName, AssetClass)> {
-  todo
+  None
 }
 
 pub fn lookup_and_check_marlowe(
-  marlowe_address: Address,
-  ctx: ScriptContext,
+  _marlowe_address: Address,
+  _ctx: ScriptContext,
 ) -> Option<(Output, Redeemer)> {
-  todo
+  None
 }
 
 pub fn lookup_charli3_feed(
-  c3_addr: Address,
-  c3_policy_id: PolicyId,
-  c3_token_name: AssetName,
-  ctx: ScriptContext,
+  _c3_addr: Address,
+  _c3_policy_id: PolicyId,
+  _c3_token_name: AssetName,
+  _ctx: ScriptContext,
 ) -> Option<Int> {
-  todo
+  None
 }
 
 pub fn lookup_orcfax_feed(
-  orcfax_addr: Address,
-  orcfax_policy_id: PolicyId,
-  ctx: ScriptContext,
+  _orcfax_addr: Address,
+  _orcfax_policy_id: PolicyId,
+  _ctx: ScriptContext,
 ) -> Option<(Int, Int)> {
-  todo
+  None
 }
 
 pub fn check_bridge_utxo(
-  input: Output,
-  output: Output,
-  ctx: ScriptContext,
+  _input: Output,
+  _output: Output,
+  _ctx: ScriptContext,
 ) -> Bool {
-  todo
+  False
 }
 
-pub fn check_marlowe_has_thread_token(input: Output, ac: AssetClass) -> Bool {
-  todo
+pub fn check_marlowe_has_thread_token(_input: Output, _ac: AssetClass) -> Bool {
+  False
 }
 
-pub fn check_bridge_destroy_utxo(datum: Data, ctx: ScriptContext) -> Bool {
-  todo
+pub fn check_bridge_destroy_utxo(_datum: Data, _ctx: ScriptContext) -> Bool {
+  False
 }
 
-pub fn check_choice(tn: AssetName, cd: ChoiceDict, redeemer: Redeemer) -> Bool {
-  todo
+pub fn check_choice(_tn: AssetName, _cd: ChoiceDict, _redeemer: Redeemer) -> Bool {
+  False
 }

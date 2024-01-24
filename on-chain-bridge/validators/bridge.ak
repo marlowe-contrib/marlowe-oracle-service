@@ -1,6 +1,6 @@
 use aiken/bytearray
 use aiken/dict
-use aiken/transaction.{Output, Redeemer, ScriptContext}
+use aiken/transaction.{ScriptContext}
 use aiken/transaction/credential.{Address}
 use aiken/transaction/value.{AssetName, PolicyId}
 use checks.{
