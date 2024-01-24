@@ -1,4 +1,6 @@
-use aiken/transaction.{Output, Redeemer, ScriptContext}
+use aiken/dict
+use aiken/list
+use aiken/transaction.{Output, Redeemer, ScriptContext, Spend}
 use aiken/transaction/credential.{Address}
 use aiken/transaction/value.{AssetName, PolicyId}
 use types.{AssetClass, ChoiceDict}
@@ -9,11 +11,37 @@ pub fn lookup_and_check_bridge(
   None
 }
 
+/// `lookup_and_check_marlowe` function
+///
+/// This function checks if there's a marlowe input in the transaction, with a
+/// corresponding redeemer.
+///
+/// # Parameters:
+/// - `marlowe_address`: The address of the marlowe validator
+/// - `ctx`: The script context
+///
+/// # Returns
+/// - The marlowe `Output` and the corresponding redeemer inside a `Some` if
+/// there's only one marlowe input in the transaction. `None` if there's no
+/// marlowe input. Fails if there's more than one marlowe input.
 pub fn lookup_and_check_marlowe(
-  _marlowe_address: Address,
-  _ctx: ScriptContext,
+  marlowe_address: Address,
+  ctx: ScriptContext,
 ) -> Option<(Output, Redeemer)> {
-  None
+  let marlowe_inputs =
+    ctx.transaction.inputs
+      |> list.filter(fn(input) { input.output.address == marlowe_address })
+
+  when marlowe_inputs is {
+    [] -> None
+    [marlowe_input] -> {
+      expect Some(marlowe_redeemer) =
+        ctx.transaction.redeemers
+          |> dict.get(Spend(marlowe_input.output_reference))
+      Some((marlowe_input.output, marlowe_redeemer))
+    }
+    _more_than_one -> fail @"More than one marlowe input found"
+  }
 }
 
 pub fn lookup_charli3_feed(
@@ -49,6 +77,14 @@ pub fn check_bridge_destroy_utxo(_datum: Data, _ctx: ScriptContext) -> Bool {
   False
 }
 
-pub fn check_choice(_tn: AssetName, _cd: ChoiceDict, _redeemer: Redeemer) -> Bool {
+pub fn check_choice(
+  _tn: AssetName,
+  _cd: ChoiceDict,
+  _redeemer: Redeemer,
+) -> Bool {
   False
+}
+
+test aaa() {
+  True
 }
