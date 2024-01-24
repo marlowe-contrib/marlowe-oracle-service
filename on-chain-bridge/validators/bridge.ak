@@ -1,26 +1,90 @@
-use aiken/transaction.{ScriptContext}
+use aiken/bytearray
+use aiken/dict
+use aiken/transaction.{Output, Redeemer, ScriptContext}
 use aiken/transaction/credential.{Address}
 use aiken/transaction/value.{AssetName, PolicyId}
+use checks.{
+  check_bridge_destroy_utxo, check_bridge_utxo, check_choice,
+  check_marlowe_has_thread_token, lookup_and_check_bridge,
+  lookup_and_check_marlowe, lookup_charli3_feed, lookup_orcfax_feed,
+}
+use types.{ChoiceDict}
 
 validator(
-  marloweAddress: Address,
-  charli3Address: Address,
-  charli3PolicyId: PolicyId,
-  charli3TokenName: AssetName,
-  choiceName: ByteArray,
+  marlowe_address: Address,
+  charli3_address: Address,
+  charli3_policy_id: PolicyId,
+  charli3_token_name: AssetName,
+  choice_name: ByteArray,
 ) {
-  fn charli3_bridge(datum: Data, redeemer: Data, ctx: ScriptContext) -> Bool {
-    True
+  fn charli3_bridge(datum: Data, redeemer: Bool, ctx: ScriptContext) -> Bool {
+    let opt_marlowe = lookup_and_check_marlowe(marlowe_address, ctx)
+    if redeemer {
+      expect Some((input_marlowe, redeemer_marlowe)) = opt_marlowe
+      expect Some((input_bridge, output_bridge, tn_role_token, thread_token)) =
+        lookup_and_check_bridge(ctx)
+      expect Some(feed) =
+        lookup_charli3_feed(
+          charli3_address,
+          charli3_policy_id,
+          charli3_token_name,
+          ctx,
+        )
+
+      let choice_value_dict: ChoiceDict =
+        dict.new()
+          |> dict.insert(key: choice_name, value: feed, compare: bytearray.compare)
+
+      let cb = check_bridge_utxo(input_bridge, output_bridge, ctx)
+      let ctt = check_marlowe_has_thread_token(input_marlowe, thread_token)
+      let cc = check_choice(tn_role_token, choice_value_dict, redeemer_marlowe)
+
+      cb? && ctt? && cc?
+    } else {
+      expect None = opt_marlowe
+      let cbdu = check_bridge_destroy_utxo(datum, ctx)
+      cbdu
+    }
   }
 }
 
 validator(
-  marloweAddress: Address,
-  orcfaxAddress: Address,
-  orcfaxPolicyId: PolicyId,
-  choiceName: ByteArray,
+  marlowe_address: Address,
+  orcfax_address: Address,
+  orcfax_policy_id: PolicyId,
+  choice_names: (ByteArray, ByteArray),
 ) {
-  fn orcfax_bridge(datum: Data, redeemer: Data, ctx: ScriptContext) -> Bool {
-    True
+  fn orcfax_bridge(datum: Data, redeemer: Bool, ctx: ScriptContext) -> Bool {
+    let opt_marlowe = lookup_and_check_marlowe(marlowe_address, ctx)
+    if redeemer {
+      expect Some((input_marlowe, redeemer_marlowe)) = opt_marlowe
+      expect Some((input_bridge, output_bridge, tn_role_token, thread_token)) =
+        lookup_and_check_bridge(ctx)
+      expect Some((feed1, feed2)) =
+        lookup_orcfax_feed(orcfax_address, orcfax_policy_id, ctx)
+      let (choice_name_1, choice_name_2) = choice_names
+
+      let choice_value_dict: ChoiceDict =
+        dict.new()
+          |> dict.insert(
+               key: choice_name_1,
+               value: feed1,
+               compare: bytearray.compare,
+             )
+          |> dict.insert(
+               key: choice_name_2,
+               value: feed2,
+               compare: bytearray.compare,
+             )
+
+      let cb = check_bridge_utxo(input_bridge, output_bridge, ctx)
+      let ctt = check_marlowe_has_thread_token(input_marlowe, thread_token)
+      let cc = check_choice(tn_role_token, choice_value_dict, redeemer_marlowe)
+
+      cb? && ctt? && cc?
+    } else {
+      expect None = opt_marlowe
+      check_bridge_destroy_utxo(datum, ctx)
+    }
   }
 }
