@@ -69,8 +69,9 @@ pub fn check_bridge_utxo(
   False
 }
 
-pub fn check_marlowe_has_thread_token(_input: Output, _ac: AssetClass) -> Bool {
-  False
+pub fn check_marlowe_has_thread_token(input: Output, ac: AssetClass) -> Bool {
+  let thread_token_amount = input.value |> value.quantity_of(ac.policy, ac.name)
+  thread_token_amount == 1
 }
 
 pub fn check_bridge_destroy_utxo(_datum: Data, _ctx: ScriptContext) -> Bool {
