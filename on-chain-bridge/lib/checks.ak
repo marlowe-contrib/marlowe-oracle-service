@@ -1,14 +1,45 @@
 use aiken/dict
 use aiken/list
-use aiken/transaction.{Output, Redeemer, ScriptContext, Spend}
+use aiken/transaction.{InlineDatum, Output, Redeemer, ScriptContext, Spend}
 use aiken/transaction/credential.{Address}
 use aiken/transaction/value.{AssetName, PolicyId}
 use types.{AssetClass, ChoiceDict}
 
+/// `lookup_and_check_bridge` function
+///
+/// The function looks for the bridge input and its continuing output.
+///
+/// # Parameters:
+/// - `ctx`: The script context
+///
+/// # Returns
+/// - The bridge's input and continuing output, the name of the bridge's role
+/// token, and the thread token's asset class.
 pub fn lookup_and_check_bridge(
-  _ctx: ScriptContext,
+  ctx: ScriptContext,
 ) -> Option<(Output, Output, AssetName, AssetClass)> {
-  None
+  expect Spend(output_ref) = ctx.purpose
+  expect Some(b_input) =
+    ctx.transaction.inputs |> transaction.find_input(output_ref)
+  expect Some(b_output) =
+    ctx.transaction.outputs
+      |> list.filter(fn(output) { output.address == b_input.output.address })
+      |> list.head()
+  expect InlineDatum(datum) = b_input.output.datum
+  expect thread_token_name: ByteArray = datum
+  let non_ada_asset_list =
+    b_input.output.value
+      |> value.without_lovelace()
+      |> value.flatten()
+  when non_ada_asset_list is {
+    [] -> fail @"No non ada asset in bridge utxo"
+    [(rt_policy, rt_name, _)] -> {
+      let thread_asset_class =
+        AssetClass { policy: rt_policy, name: thread_token_name }
+      Some((b_input.output, b_output, rt_name, thread_asset_class))
+    }
+    _more_than_one -> fail @"More than one non ada asset in bridge utxo"
+  }
 }
 
 /// `lookup_and_check_marlowe` function
