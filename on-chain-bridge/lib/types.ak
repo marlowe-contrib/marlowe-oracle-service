@@ -16,3 +16,28 @@ pub type AssetClass {
 
 pub type ChoiceDict =
   Dict<ByteArray, Int>
+
+// Types needed to decode the Marlowe validator redeemer
+pub type MarloweInput =
+  List<MarloweTxInput>
+
+pub type MarloweTxInput {
+  Input { content: InputContent }
+  MerkelizedTxInput { content: InputContent, hash: ByteArray }
+}
+
+pub type InputContent {
+  IDeposit { party1: Party, party2: Party, token: Data, money: Int }
+  IChoice { choice_id: ChoiceId, chosen_num: Int }
+  INotify
+}
+
+pub type ChoiceId {
+  choice_name: ByteArray,
+  choice_party: Party,
+}
+
+pub type Party {
+  PartyAddress { address: ByteArray }
+  PartyRole { role: ByteArray }
+}
