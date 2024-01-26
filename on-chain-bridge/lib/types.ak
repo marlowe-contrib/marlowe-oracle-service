@@ -22,7 +22,7 @@ pub type MarloweInput =
   List<MarloweTxInput>
 
 pub type MarloweTxInput {
-  Input { content: InputContent }
+  TxInput { content: InputContent }
   MerkelizedTxInput { content: InputContent, hash: ByteArray }
 }
 

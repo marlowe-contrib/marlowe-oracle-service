@@ -6,8 +6,8 @@ use aiken/transaction.{InlineDatum, Output, Redeemer, ScriptContext, Spend}
 use aiken/transaction/credential.{Address}
 use aiken/transaction/value.{AssetName, PolicyId}
 use types.{
-  AssetClass, ChoiceDict, ChoiceId, IChoice, INotify, Input, MarloweInput,
-  MarloweTxInput, PartyAddress, PartyRole,
+  AssetClass, ChoiceDict, ChoiceId, IChoice, INotify, MarloweInput,
+  MarloweTxInput, PartyAddress, PartyRole, TxInput,
 }
 
 /// `lookup_and_check_bridge` function
@@ -134,13 +134,12 @@ pub fn check_bridge_destroy_utxo(_datum: Data, _ctx: ScriptContext) -> Bool {
 ///          ChoiceName key
 pub fn check_choice(tn: AssetName, cd: ChoiceDict, redeemer: Redeemer) -> Bool {
   expect marlowe_input: MarloweInput = redeemer
-
   let our_choices =
     marlowe_input
       |> list.filter_map(
            fn(input) {
              when input is {
-               Input(IChoice(ChoiceId(c_name, PartyRole(role)), c_number)) ->
+               TxInput(IChoice(ChoiceId(c_name, PartyRole(role)), c_number)) ->
                  if role == tn {
                    cd |> dict.get(c_name) |> option.map2(Some(c_number), ==)
                  } else {
@@ -186,7 +185,7 @@ test check_choice_multiple_feeds() {
   check_choice(tt_name, c_dict, redeemer)
 }
 
-test check_choice_2_correct_1_ignored() {
+test check_choice_multiple_2_correct_1_ignored() {
   let tt_name = "Orcfax Oracle"
   let choice_name_1 = "Orcfax ADAUSD"
   let choice_name_2 = "Orcfax USDADA"
@@ -202,11 +201,10 @@ test check_choice_2_correct_1_ignored() {
       mk_choice_input(c_name: choice_name_2, role: tt_name, c_num: feed2),
       mk_choice_input(c_name: "Not Orcfax", role: tt_name, c_num: feed2),
     ]
-
   check_choice(tt_name, c_dict, redeemer)
 }
 
-test check_choice_1_correct_1_wrong() fail {
+test check_choice_multiple_1_correct_1_wrong() fail {
   let tt_name = "Orcfax Oracle"
   let choice_name_1 = "Orcfax ADAUSD"
   let choice_name_2 = "Orcfax USDADA"
@@ -255,7 +253,7 @@ test check_choice_wrong_party() fail {
         "addr_test1vzuqvqzcnuy9pmrh2sy7tjucufmpwh8gzssz7v6scn0e04gxdvna9",
         feed1,
       ),
-      Input { content: INotify },
+      TxInput { content: INotify },
     ]
 
   check_choice(tt_name, c_dict, redeemer)
@@ -271,7 +269,7 @@ test check_choice_wrong_role_name() fail {
   let redeemer: MarloweInput =
     [
       mk_choice_input(c_name: choice_name, role: "Fake Role", c_num: feed1),
-      Input { content: INotify },
+      TxInput { content: INotify },
     ]
 
   check_choice(tt_name, c_dict, redeemer)
@@ -287,7 +285,7 @@ test check_choice_wrong_choice_name() fail {
   let redeemer: MarloweInput =
     [
       mk_choice_input(c_name: "Not Charli3", role: tt_name, c_num: feed1),
-      Input { content: INotify },
+      TxInput { content: INotify },
     ]
 
   check_choice(tt_name, c_dict, redeemer)
@@ -303,7 +301,7 @@ test check_choice_wrong_value() fail {
   let redeemer: MarloweInput =
     [
       mk_choice_input(c_name: choice_name, role: tt_name, c_num: 100),
-      Input { content: INotify },
+      TxInput { content: INotify },
     ]
 
   check_choice(tt_name, c_dict, redeemer)
@@ -318,9 +316,9 @@ test check_choice_no_choices() fail {
       |> dict.insert(key: choice_name, value: feed1, compare: bytearray.compare)
   let redeemer: MarloweInput =
     [
-      Input { content: INotify },
-      Input { content: INotify },
-      Input { content: INotify },
+      TxInput { content: INotify },
+      TxInput { content: INotify },
+      TxInput { content: INotify },
     ]
 
   check_choice(tt_name, c_dict, redeemer)
@@ -337,7 +335,7 @@ test check_choice_1_correct_1_wrong_value() fail {
     [
       mk_choice_input(c_name: choice_name, role: tt_name, c_num: 100),
       mk_choice_input(c_name: choice_name, role: tt_name, c_num: feed1),
-      Input { content: INotify },
+      TxInput { content: INotify },
     ]
 
   check_choice(tt_name, c_dict, redeemer)
@@ -348,7 +346,7 @@ fn mk_choice_input(
   role: AssetName,
   c_num: Int,
 ) -> MarloweTxInput {
-  Input {
+  TxInput {
     content: IChoice {
       choice_id: ChoiceId {
         choice_name: c_name,
@@ -364,7 +362,7 @@ fn mk_choice_input_address(
   address: ByteArray,
   c_num: Int,
 ) -> MarloweTxInput {
-  Input {
+  TxInput {
     content: IChoice {
       choice_id: ChoiceId {
         choice_name: c_name,
