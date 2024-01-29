@@ -1,4 +1,6 @@
 use aiken/dict.{Dict}
+use aiken/hash.{Blake2b_224, Hash}
+use aiken/transaction/credential.{VerificationKey}
 use aiken/transaction/value.{AssetName, PolicyId}
 
 // Represents a unique class of asset in the Cardano network.
@@ -16,6 +18,11 @@ pub type AssetClass {
 
 pub type ChoiceDict =
   Dict<ByteArray, Int>
+
+pub type BridgeDatum {
+  pkh: Hash<Blake2b_224, VerificationKey>,
+  token_name: ByteArray,
+}
 
 // Types needed to decode the Marlowe validator redeemer
 pub type MarloweInput =
