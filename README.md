@@ -124,3 +124,10 @@ The complete command to deploy a marlowe contract, requesting charli3 oracle dat
 ```bash
 npm run deploy-example -- tests/charli3-choice-info.json requires.marlowe.oracle.test.alpha.2
 ```
+
+## Stats
+
+<p align="center">
+  <img src="https://repobeats.axiom.co/api/embed/50ff07bb288628e956db23e9899c5bd108134805.svg">
+</p>
+
