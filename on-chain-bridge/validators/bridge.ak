@@ -23,7 +23,7 @@ validator(
       expect Some((input_marlowe, redeemer_marlowe)) = opt_marlowe
       expect Some((input_bridge, output_bridge, tn_role_token, thread_token)) =
         lookup_and_check_bridge(ctx)
-      expect Some(feed) =
+      let feed =
         lookup_charli3_feed(
           charli3_address,
           charli3_policy_id,
