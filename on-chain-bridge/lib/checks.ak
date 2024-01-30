@@ -289,34 +289,30 @@ test check_bridge_destroy_utxo_continuing_output() fail {
     value.negate(one_non_ada_asset)
       |> value.to_minted_value()
 
+  let output =
+    Output {
+      address: placeholder_address,
+      value: one_non_ada_asset,
+      datum: InlineDatum(datum),
+      reference_script: None,
+    }
 
-  let output = Output {
-                   address: placeholder_address,
-                   value: one_non_ada_asset,
-                   datum: InlineDatum(datum),
-                   reference_script: None,
-                 }
-
-  let context = ScriptContext {
-    purpose: Spend(placeholder_utxo),
-    transaction: transaction.placeholder()
-      |> fn(transaction) {
-           Transaction { ..transaction, extra_signatories: [datum.pkh] }
-         }
-      |> fn(transaction) {
-           Transaction {
-             ..transaction,
-             inputs: [
-               Input {
-                 output_reference: placeholder_utxo,
-                 output: output,
-               },
-             ],
+  let context =
+    ScriptContext {
+      purpose: Spend(placeholder_utxo),
+      transaction: transaction.placeholder()
+        |> fn(transaction) {
+             Transaction { ..transaction, extra_signatories: [datum.pkh] }
            }
-         }
-      |> fn(transaction) { Transaction { ..transaction, mint: mint } }
-      |> fn(transaction) { Transaction { ..transaction, outputs: [output]}}
-  }
+        |> fn(transaction) {
+             Transaction {
+               ..transaction,
+               inputs: [Input { output_reference: placeholder_utxo, output }],
+             }
+           }
+        |> fn(transaction) { Transaction { ..transaction, mint: mint } }
+        |> fn(transaction) { Transaction { ..transaction, outputs: [output] } },
+    }
   check_bridge_destroy_utxo(datum, context)
 }
 
