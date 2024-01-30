@@ -271,6 +271,55 @@ test check_bridge_destroy_utxo_wrong_signer() fail {
   check_bridge_destroy_utxo(bad_datum, context)
 }
 
+test check_bridge_destroy_utxo_continuing_output() fail {
+  let placeholder_utxo =
+    OutputReference { transaction_id: TransactionId(""), output_index: 0 }
+
+  let placeholder_address =
+    Address {
+      payment_credential: VerificationKeyCredential(#"00"),
+      stake_credential: None,
+    }
+  let datum = BridgeDatum { pkh: #"01", token_name: "Thread Token" }
+
+  let one_non_ada_asset: Value =
+    value.zero()
+      |> value.add(#"02", "Oracle token", 1)
+  let mint: MintedValue =
+    value.negate(one_non_ada_asset)
+      |> value.to_minted_value()
+
+
+  let output = Output {
+                   address: placeholder_address,
+                   value: one_non_ada_asset,
+                   datum: InlineDatum(datum),
+                   reference_script: None,
+                 }
+
+  let context = ScriptContext {
+    purpose: Spend(placeholder_utxo),
+    transaction: transaction.placeholder()
+      |> fn(transaction) {
+           Transaction { ..transaction, extra_signatories: [datum.pkh] }
+         }
+      |> fn(transaction) {
+           Transaction {
+             ..transaction,
+             inputs: [
+               Input {
+                 output_reference: placeholder_utxo,
+                 output: output,
+               },
+             ],
+           }
+         }
+      |> fn(transaction) { Transaction { ..transaction, mint: mint } }
+      |> fn(transaction) { Transaction { ..transaction, outputs: [output]}}
+  }
+  check_bridge_destroy_utxo(datum, context)
+}
+
 /// `check_choice` function
 ///
 /// This function checks if the choices contained in the marlowe redeemer are
