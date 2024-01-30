@@ -1,6 +1,5 @@
 use aiken/bytearray
 use aiken/dict
-use aiken/hash.{Blake2b_224, Hash}
 use aiken/list
 use aiken/option
 use aiken/transaction.{
@@ -8,7 +7,7 @@ use aiken/transaction.{
   Transaction, TransactionId,
 }
 use aiken/transaction/credential.{
-  Address, VerificationKey, VerificationKeyCredential,
+  Address, ScriptCredential, VerificationKeyCredential,
 }
 use aiken/transaction/value.{AssetName, MintedValue, PolicyId, Value}
 use types.{
@@ -18,7 +17,8 @@ use types.{
 
 /// `lookup_and_check_bridge` function
 ///
-/// The function looks for the bridge input and its continuing output.
+/// The function looks for the bridge input and its continuing output, and makes
+/// that they are unique.
 ///
 /// # Parameters:
 /// - `ctx`: The script context
@@ -30,25 +30,38 @@ pub fn lookup_and_check_bridge(
   ctx: ScriptContext,
 ) -> Option<(Output, Output, AssetName, AssetClass)> {
   expect Spend(output_ref) = ctx.purpose
-  expect Some(b_input) =
+  expect Some(input) =
     ctx.transaction.inputs |> transaction.find_input(output_ref)
-  expect Some(b_output) =
+  let b_inputs =
+    ctx.transaction.inputs
+      |> list.filter(fn(in) { in.output.address == input.output.address })
+  let b_input =
+    when b_inputs is {
+      [in] -> in.output
+      _more_than_one -> fail @"More than one bridge input"
+    }
+  let b_outputs =
     ctx.transaction.outputs
-      |> list.filter(fn(output) { output.address == b_input.output.address })
-      |> list.head()
-  expect InlineDatum(datum) = b_input.output.datum
-  expect (_, thread_token_name): (Hash<Blake2b_224, VerificationKey>, ByteArray) =
-    datum
+      |> list.filter(fn(output) { output.address == b_input.address })
+  let b_output =
+    when b_outputs is {
+      [] -> fail @"No continuing output found"
+      [out] -> out
+      _more_than_one -> fail @"More than one bridge output"
+    }
+
+  expect InlineDatum(datum) = b_input.datum
+  expect b_datum: BridgeDatum = datum
   let non_ada_asset_list =
-    b_input.output.value
+    b_input.value
       |> value.without_lovelace()
       |> value.flatten()
   when non_ada_asset_list is {
     [] -> fail @"No non ada asset in bridge utxo"
     [(rt_policy, rt_name, _)] -> {
       let thread_asset_class =
-        AssetClass { policy: rt_policy, name: thread_token_name }
-      Some((b_input.output, b_output, rt_name, thread_asset_class))
+        AssetClass { policy: rt_policy, name: b_datum.token_name }
+      Some((b_input, b_output, rt_name, thread_asset_class))
     }
     _more_than_one -> fail @"More than one non ada asset in bridge utxo"
   }
@@ -104,12 +117,57 @@ pub fn lookup_orcfax_feed(
   None
 }
 
-pub fn check_bridge_utxo(
-  _input: Output,
-  _output: Output,
-  _ctx: ScriptContext,
-) -> Bool {
-  False
+/// function `check_bridge_destroy_utxo`
+///
+/// This function is responsible for the validations regarding the bridge utxo
+/// Those validations are the following:
+/// - The value and the datum of the bridge utxo remains the same in its
+/// cointinuing output
+/// - There is exactly one non-ada token in the bridge utxo (it is presumed to
+/// be the role token)
+///
+/// # Parameters:
+/// - `input`: the bridge's input utxo
+/// - `output`: the bridge's output utxo
+///
+/// # Returns
+/// - True if the aforementioned conditions are met
+pub fn check_bridge_utxo(input: Output, output: Output) -> Bool {
+  let value_same = input.value == output.value
+  let datum_same = input.datum == output.datum
+  let one_non_ada_asset =
+    (
+      input.value
+        |> value.without_lovelace()
+        |> value.flatten
+        |> list.length()
+    ) == 1
+  value_same? && datum_same? && one_non_ada_asset?
+}
+
+test check_bridge_more_than_1_non_ada_asset() fail {
+  let bridge_value =
+    value.from_lovelace(1000000)
+      |> value.add(#"01", "Oracle role", 1)
+      |> value.add(#"02", "Oracle role", 1)
+  let input = mk_output()
+  let bad_input = Output { ..input, value: bridge_value }
+
+  check_bridge_utxo(bad_input, bad_input)
+}
+
+test check_bridge_datum_changed() fail {
+  let bad_datum = BridgeDatum { pkh: #"02", token_name: "Other Token" }
+  let input = mk_output()
+  let bad_output = Output { ..input, datum: InlineDatum(bad_datum) }
+  check_bridge_utxo(input, bad_output)
+}
+
+test check_bridge_value_changed() fail {
+  let bad_value = value.from_lovelace(1000000)
+  let input = mk_output()
+  let bad_output = Output { ..input, value: bad_value }
+  check_bridge_utxo(input, bad_output)
 }
 
 pub fn check_marlowe_has_thread_token(input: Output, ac: AssetClass) -> Bool {
@@ -156,18 +214,8 @@ pub fn check_bridge_destroy_utxo(datum: Data, ctx: ScriptContext) -> Bool {
   signer_is_in_datum? && non_ada_assets_are_burnt?
 }
 
-test check_bridge_destroy_utxo_one_non_ada_asset_is_burnt() {
-  let placeholder_utxo =
-    OutputReference { transaction_id: TransactionId(""), output_index: 0 }
-
-  let placeholder_address =
-    Address {
-      payment_credential: VerificationKeyCredential(#"00"),
-      stake_credential: None,
-    }
-
+test check_bridge_destroy_utxo_1_non_ada_asset_is_burnt() {
   let datum = BridgeDatum { pkh: #"01", token_name: "Thread Token" }
-
   let one_non_ada_asset: Value =
     value.zero()
       |> value.add(#"02", "Oracle token", 1)
@@ -175,172 +223,52 @@ test check_bridge_destroy_utxo_one_non_ada_asset_is_burnt() {
   let mint: MintedValue =
     value.negate(one_non_ada_asset)
       |> value.to_minted_value()
-
-  let context =
-    ScriptContext {
-      purpose: Spend(placeholder_utxo),
-      transaction: transaction.placeholder()
-        |> fn(transaction) {
-             Transaction { ..transaction, extra_signatories: [datum.pkh] }
-           }
-        |> fn(transaction) {
-             Transaction {
-               ..transaction,
-               inputs: [
-                 Input {
-                   output_reference: placeholder_utxo,
-                   output: Output {
-                     address: placeholder_address,
-                     value: one_non_ada_asset,
-                     datum: InlineDatum(datum),
-                     reference_script: None,
-                   },
-                 },
-               ],
-             }
-           }
-        |> fn(transaction) { Transaction { ..transaction, mint: mint } },
-    }
-
+  let context = mk_script_context(one_non_ada_asset, mint, datum)
   check_bridge_destroy_utxo(datum, context)
 }
 
-test check_bridge_destroy_utxo_two_non_ada_asset_is_burnt() {
-  let placeholder_utxo =
-    OutputReference { transaction_id: TransactionId(""), output_index: 0 }
-
-  let placeholder_address =
-    Address {
-      payment_credential: VerificationKeyCredential(#"00"),
-      stake_credential: None,
-    }
-
+test check_bridge_destroy_utxo_2_non_ada_asset_is_burnt() {
   let datum = BridgeDatum { pkh: #"01", token_name: "Thread Token" }
-
-  let one_non_ada_asset: Value =
+  let two_non_ada_asset: Value =
     value.zero()
       |> value.add(#"02", "Oracle token", 1)
       |> value.add(#"03", "Thread token", 1)
 
   let mint: MintedValue =
-    value.negate(one_non_ada_asset)
+    value.negate(two_non_ada_asset)
       |> value.to_minted_value()
 
-  let context =
-    ScriptContext {
-      purpose: Spend(placeholder_utxo),
-      transaction: transaction.placeholder()
-        |> fn(transaction) {
-             Transaction { ..transaction, extra_signatories: [datum.pkh] }
-           }
-        |> fn(transaction) {
-             Transaction {
-               ..transaction,
-               inputs: [
-                 Input {
-                   output_reference: placeholder_utxo,
-                   output: Output {
-                     address: placeholder_address,
-                     value: one_non_ada_asset,
-                     datum: InlineDatum(datum),
-                     reference_script: None,
-                   },
-                 },
-               ],
-             }
-           }
-        |> fn(transaction) { Transaction { ..transaction, mint: mint } },
-    }
+  let context = mk_script_context(two_non_ada_asset, mint, datum)
 
   check_bridge_destroy_utxo(datum, context)
 }
 
 test check_bridge_destroy_utxo_non_ada_asset_isnt_burnt() fail {
-  let placeholder_utxo =
-    OutputReference { transaction_id: TransactionId(""), output_index: 0 }
-
-  let placeholder_address =
-    Address {
-      payment_credential: VerificationKeyCredential(#"00"),
-      stake_credential: None,
-    }
-
   let datum = BridgeDatum { pkh: #"01", token_name: "Thread Token" }
-
   let one_non_ada_asset: Value =
     value.zero()
       |> value.add(#"02", "Oracle token", 1)
+  let no_mint: MintedValue = value.from_lovelace(0) |> value.to_minted_value()
 
-  let context =
-    ScriptContext {
-      purpose: Spend(placeholder_utxo),
-      transaction: transaction.placeholder()
-        |> fn(transaction) {
-             Transaction { ..transaction, extra_signatories: [datum.pkh] }
-           }
-        |> fn(transaction) {
-             Transaction {
-               ..transaction,
-               inputs: [
-                 Input {
-                   output_reference: placeholder_utxo,
-                   output: Output {
-                     address: placeholder_address,
-                     value: one_non_ada_asset,
-                     datum: InlineDatum(datum),
-                     reference_script: None,
-                   },
-                 },
-               ],
-             }
-           },
-    }
+  let context = mk_script_context(one_non_ada_asset, no_mint, datum)
 
   check_bridge_destroy_utxo(datum, context)
 }
 
 test check_bridge_destroy_utxo_wrong_signer() fail {
-  let placeholder_utxo =
-    OutputReference { transaction_id: TransactionId(""), output_index: 0 }
-
-  let placeholder_address =
-    Address {
-      payment_credential: VerificationKeyCredential(#"00"),
-      stake_credential: None,
-    }
-
   let datum = BridgeDatum { pkh: #"01", token_name: "Thread Token" }
+  let bad_datum = BridgeDatum { pkh: #"00", token_name: "Thread Token" }
 
   let one_non_ada_asset: Value =
     value.zero()
       |> value.add(#"02", "Oracle token", 1)
+  let mint: MintedValue =
+    value.negate(one_non_ada_asset)
+      |> value.to_minted_value()
 
-  let context =
-    ScriptContext {
-      purpose: Spend(placeholder_utxo),
-      transaction: transaction.placeholder()
-        |> fn(transaction) {
-             Transaction { ..transaction, extra_signatories: [#"02"] }
-           }
-        |> fn(transaction) {
-             Transaction {
-               ..transaction,
-               inputs: [
-                 Input {
-                   output_reference: placeholder_utxo,
-                   output: Output {
-                     address: placeholder_address,
-                     value: one_non_ada_asset,
-                     datum: InlineDatum(datum),
-                     reference_script: None,
-                   },
-                 },
-               ],
-             }
-           },
-    }
+  let context = mk_script_context(one_non_ada_asset, mint, datum)
 
-  check_bridge_destroy_utxo(datum, context)
+  check_bridge_destroy_utxo(bad_datum, context)
 }
 
 /// `check_choice` function
@@ -599,5 +527,59 @@ fn mk_choice_input_address(
       },
       chosen_num: c_num,
     },
+  }
+}
+
+fn mk_output() -> Output {
+  let bridge_address =
+    Address {
+      payment_credential: ScriptCredential("0"),
+      stake_credential: None,
+    }
+  let bridge_datum = BridgeDatum { pkh: #"01", token_name: "Thread Token" }
+  let bridge_value =
+    value.from_lovelace(1000000)
+      |> value.add(#"01", "Oracle role", 1)
+  Output {
+    address: bridge_address,
+    value: bridge_value,
+    datum: InlineDatum(bridge_datum),
+    reference_script: None,
+  }
+}
+
+fn mk_script_context(v: Value, m: MintedValue, d: BridgeDatum) -> ScriptContext {
+  let placeholder_utxo =
+    OutputReference { transaction_id: TransactionId(""), output_index: 0 }
+
+  let placeholder_address =
+    Address {
+      payment_credential: VerificationKeyCredential(#"00"),
+      stake_credential: None,
+    }
+
+  ScriptContext {
+    purpose: Spend(placeholder_utxo),
+    transaction: transaction.placeholder()
+      |> fn(transaction) {
+           Transaction { ..transaction, extra_signatories: [d.pkh] }
+         }
+      |> fn(transaction) {
+           Transaction {
+             ..transaction,
+             inputs: [
+               Input {
+                 output_reference: placeholder_utxo,
+                 output: Output {
+                   address: placeholder_address,
+                   value: v,
+                   datum: InlineDatum(d),
+                   reference_script: None,
+                 },
+               },
+             ],
+           }
+         }
+      |> fn(transaction) { Transaction { ..transaction, mint: m } },
   }
 }

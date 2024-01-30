@@ -35,7 +35,7 @@ validator(
         dict.new()
           |> dict.insert(key: choice_name, value: feed, compare: bytearray.compare)
 
-      let cb = check_bridge_utxo(input_bridge, output_bridge, ctx)
+      let cb = check_bridge_utxo(input_bridge, output_bridge)
       let ctt = check_marlowe_has_thread_token(input_marlowe, thread_token)
       let cc = check_choice(tn_role_token, choice_value_dict, redeemer_marlowe)
 
@@ -77,7 +77,7 @@ validator(
                compare: bytearray.compare,
              )
 
-      let cb = check_bridge_utxo(input_bridge, output_bridge, ctx)
+      let cb = check_bridge_utxo(input_bridge, output_bridge)
       let ctt = check_marlowe_has_thread_token(input_marlowe, thread_token)
       let cc = check_choice(tn_role_token, choice_value_dict, redeemer_marlowe)
 
