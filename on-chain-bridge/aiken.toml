@@ -1,0 +1,14 @@
+name = "marlowe-oracle-service/on-chain-bridge"
+version = "0.0.0"
+license = "Apache-2.0"
+description = "Aiken contracts for project 'marlowe-oracle-service/on-chain-bridge'"
+
+[repository]
+user = "marlowe-oracle-service"
+project = "on-chain-bridge"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "1.7.0"
+source = "github"

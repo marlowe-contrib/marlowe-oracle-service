@@ -125,6 +125,19 @@ The complete command to deploy a marlowe contract, requesting charli3 oracle dat
 npm run deploy-example -- tests/charli3-choice-info.json requires.marlowe.oracle.test.alpha.2
 ```
 
+## Bridge validators
+The code for the on-chain validators can be found in the `on-chain-bridge` folder. To compile it or tests it we need to have Aiken installed. We recommend version `1.0.23`.
+To compile the on-chain code:
+```bash
+$ aiken build
+```
+The compiled code will be found in the `plutus.json` file.
+
+To run the tests:
+```bash
+$ aiken check
+```
+
 ## Stats
 
 <p align="center">
