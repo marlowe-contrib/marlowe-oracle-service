@@ -83,7 +83,7 @@ validator(
       cb? && ctt? && cc?
     } else {
       expect None = opt_marlowe
-      check_bridge_destroy_utxo(datum, ctx)
+      check_bridge_destroy_utxo(datum, ctx)?
     }
   }
 }
