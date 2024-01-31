@@ -42,8 +42,7 @@ validator(
       cb? && ctt? && cc?
     } else {
       expect None = opt_marlowe
-      let cbdu = check_bridge_destroy_utxo(datum, ctx)
-      cbdu
+      check_bridge_destroy_utxo(datum, ctx)?
     }
   }
 }

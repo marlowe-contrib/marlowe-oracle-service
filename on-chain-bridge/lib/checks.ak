@@ -70,7 +70,8 @@ pub fn lookup_and_check_bridge(
 /// `lookup_and_check_marlowe` function
 ///
 /// This function checks if there's a marlowe input in the transaction, with a
-/// corresponding redeemer.
+/// corresponding redeemer. For a True redeemer, exactly one Marlowe input is expected.
+/// For a False redeemer, no Marlowe input is expected. 
 ///
 /// # Parameters:
 /// - `marlowe_address`: The address of the marlowe validator
@@ -117,7 +118,7 @@ pub fn lookup_orcfax_feed(
   None
 }
 
-/// function `check_bridge_destroy_utxo`
+/// function `check_bridge_utxo`
 ///
 /// This function is responsible for the validations regarding the bridge utxo
 /// Those validations are the following:
@@ -135,6 +136,9 @@ pub fn lookup_orcfax_feed(
 pub fn check_bridge_utxo(input: Output, output: Output) -> Bool {
   let value_same = input.value == output.value
   let datum_same = input.datum == output.datum
+  let address_same = input.address == output.address
+  expect None = input.reference_script
+  expect None = output.reference_script
   let one_non_ada_asset =
     (
       input.value
@@ -142,7 +146,7 @@ pub fn check_bridge_utxo(input: Output, output: Output) -> Bool {
         |> value.flatten
         |> list.length()
     ) == 1
-  value_same? && datum_same? && one_non_ada_asset?
+  value_same? && datum_same? && address_same? && one_non_ada_asset?
 }
 
 test check_bridge_more_than_1_non_ada_asset() fail {
