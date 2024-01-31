@@ -3,8 +3,8 @@ use aiken/dict
 use aiken/list
 use aiken/option
 use aiken/transaction.{
-  InlineDatum, Input, Output, OutputReference, Redeemer, ScriptContext, Spend,
-  Transaction, TransactionId,
+  InlineDatum, Input, NoDatum, Output, OutputReference, Redeemer, ScriptContext,
+  Spend, Transaction, TransactionId,
 }
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
@@ -71,7 +71,7 @@ pub fn lookup_and_check_bridge(
 ///
 /// This function checks if there's a marlowe input in the transaction, with a
 /// corresponding redeemer. For a True redeemer, exactly one Marlowe input is expected.
-/// For a False redeemer, no Marlowe input is expected. 
+/// For a False redeemer, no Marlowe input is expected.
 ///
 /// # Parameters:
 /// - `marlowe_address`: The address of the marlowe validator
@@ -177,6 +177,68 @@ test check_bridge_value_changed() fail {
 pub fn check_marlowe_has_thread_token(input: Output, ac: AssetClass) -> Bool {
   let thread_token_amount = input.value |> value.quantity_of(ac.policy, ac.name)
   thread_token_amount == 1
+}
+
+test check_marlowe_has_thread_token_quantity_more_than_one() fail {
+  let marlowe_address =
+    Address {
+      payment_credential: ScriptCredential("0"),
+      stake_credential: None,
+    }
+  let asset_class = AssetClass { policy: #"01", name: "Thread Token" }
+  let marlowe_value =
+    value.from_lovelace(1000000)
+      |> value.add(#"01", "Thread Token", 2)
+  let output =
+    Output {
+      address: marlowe_address,
+      value: marlowe_value,
+      datum: NoDatum,
+      reference_script: None,
+    }
+
+  check_marlowe_has_thread_token(output, asset_class)
+}
+
+test check_marlowe_has_thread_token_wrong_asset_class() fail {
+  let marlowe_address =
+    Address {
+      payment_credential: ScriptCredential("0"),
+      stake_credential: None,
+    }
+  let asset_class = AssetClass { policy: #"01", name: "Thread Token" }
+  let marlowe_value =
+    value.from_lovelace(1000000)
+      |> value.add(#"02", "Thread Token", 2)
+  let output =
+    Output {
+      address: marlowe_address,
+      value: marlowe_value,
+      datum: NoDatum,
+      reference_script: None,
+    }
+
+  check_marlowe_has_thread_token(output, asset_class)
+}
+
+test check_marlowe_has_thread_token_no_token() fail {
+  let marlowe_address =
+    Address {
+      payment_credential: ScriptCredential("0"),
+      stake_credential: None,
+    }
+  let asset_class = AssetClass { policy: #"01", name: "Thread Token" }
+  let marlowe_value =
+    value.from_lovelace(1000000)
+  let output =
+    Output {
+      address: marlowe_address,
+      value: marlowe_value,
+      datum: NoDatum,
+      reference_script: None,
+    }
+
+  check_marlowe_has_thread_token(output, asset_class)
 }
 
 /// function `check_bridge_destroy_utxo`

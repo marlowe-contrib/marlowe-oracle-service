@@ -28,3 +28,10 @@ test/*.js
 *.map
 
 .vscode
+
+# Aiken compilation artifacts
+on-chain-bridge/artifacts/
+# Aiken's project working directory
+on-chain-bridge/build/
+# Aiken's default documentation export
+on-chain-bridge/docs/
