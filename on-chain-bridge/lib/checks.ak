@@ -1,5 +1,4 @@
 use aiken/bytearray
-use aiken/cbor
 use aiken/dict
 use aiken/interval
 use aiken/list
@@ -12,10 +11,10 @@ use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
 use aiken/transaction/value.{AssetName, MintedValue, PolicyId, Value}
+use oracles/charli3.{C3Datum, Price, Prices, parse_price_dict}
 use types.{
-  AssetClass, BridgeDatum, C3Datum, ChoiceDict, ChoiceId, IChoice, INotify,
-  MarloweInput, MarloweTxInput, PartyAddress, PartyRole, Price, Prices, TxInput,
-  create_price_dict, parse_price_dict,
+  AssetClass, BridgeDatum, ChoiceDict, ChoiceId, IChoice, INotify, MarloweInput,
+  MarloweTxInput, PartyAddress, PartyRole, TxInput,
 }
 
 /// `lookup_and_check_bridge` function
@@ -730,20 +729,4 @@ fn mk_script_context(v: Value, m: MintedValue, d: BridgeDatum) -> ScriptContext 
          }
       |> fn(transaction) { Transaction { ..transaction, mint: m } },
   }
-}
-
-test check_charli3_datum_encoding() {
-  let correct_cbor =
-    #"d8799fd87b9fa3001a00078e10011b0000018d233537b5021b0000018d2350aef5ffff"
-  let mock_datum: C3Datum =
-    C3Datum(
-      Prices(
-        create_price_dict(
-          price: 495120,
-          invalid_before: 1705692706741,
-          invalid_hereafter: 1705694506741,
-        ),
-      ),
-    )
-  cbor.serialise(mock_datum) == correct_cbor
 }
