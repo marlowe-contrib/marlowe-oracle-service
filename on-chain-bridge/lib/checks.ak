@@ -1,10 +1,11 @@
 use aiken/bytearray
 use aiken/dict
+use aiken/interval
 use aiken/list
 use aiken/option
 use aiken/transaction.{
-  InlineDatum, Input, NoDatum, Output, OutputReference, Redeemer, ScriptContext,
-  Spend, Transaction, TransactionId,
+  Datum, InlineDatum, Input, NoDatum, Output, OutputReference, Redeemer,
+  ScriptContext, Spend, Transaction, TransactionId,
 }
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
@@ -12,7 +13,8 @@ use aiken/transaction/credential.{
 use aiken/transaction/value.{AssetName, MintedValue, PolicyId, Value}
 use types.{
   AssetClass, BridgeDatum, ChoiceDict, ChoiceId, IChoice, INotify, MarloweInput,
-  MarloweTxInput, PartyAddress, PartyRole, TxInput,
+  MarloweTxInput, ParsedOrcfaxDatum, PartyAddress, PartyRole, RawOrcfaxDatum,
+  TxInput, get_parsed_orcfax_datum,
 }
 
 /// `lookup_and_check_bridge` function
@@ -101,12 +103,53 @@ pub fn lookup_and_check_marlowe(
   }
 }
 
+/// `lookup_orcfax_feed` function
+///
+/// This function checks if there's a single orcfax reference input in the
+/// transaction. It parses it's datum and returns the feed prices if it's valid
+///
+/// # Parameters:
+/// - `orcfax_addr`: The address of the orcfax validator
+/// - `orcfax_policy_id`: The policy ID of the orcfax tokens corresponding to the
+///     feed we are looking for
+/// - `orcfax_feed_name`: The feed name of the orcfax feed we are looking for
+/// - `ctx`: The script context
+///
+/// # Returns
+/// - The feed prices if they are contained in the datum and it's valid,
+///    according to the tx validity interval.
 pub fn lookup_orcfax_feed(
-  _orcfax_addr: Address,
-  _orcfax_policy_id: PolicyId,
-  _ctx: ScriptContext,
-) -> Option<(Int, Int)> {
-  None
+  orcfax_addr: Address,
+  orcfax_policy_id: PolicyId,
+  orcfax_feed_name: ByteArray,
+  ctx: ScriptContext,
+) -> (Int, Int) {
+  expect [orcfax_input]: List<Input> =
+    ctx.transaction.reference_inputs
+      |> list.filter(fn(input) { input.output.address == orcfax_addr })
+
+  expect 1 =
+    orcfax_input.output.value
+      |> value.tokens(orcfax_policy_id)
+      |> dict.foldl(0, fn(_key, elem, acc) { acc + elem })
+
+  expect InlineDatum(d): Datum = orcfax_input.output.datum
+  expect raw_datum: RawOrcfaxDatum = d
+
+  expect Some(p_datum): Option<ParsedOrcfaxDatum> =
+    get_parsed_orcfax_datum(raw_datum)
+
+  let validity_interval = ctx.transaction.validity_range
+  let cb =
+    interval.is_entirely_before(validity_interval, p_datum.invalid_hereafter)
+  let ca = interval.is_entirely_after(validity_interval, p_datum.invalid_before)
+  let cn = p_datum.name == orcfax_feed_name
+
+  if ca && cb && cn {
+    p_datum.feeds
+  } else {
+    fail @"Found orcfax feed but it's expired, not valid yet or has a different name"
+  }
 }
 
 /// function `check_bridge_utxo`
