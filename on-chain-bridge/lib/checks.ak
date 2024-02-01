@@ -11,10 +11,10 @@ use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
 use aiken/transaction/value.{AssetName, MintedValue, PolicyId, Value}
+use oracles/orcfax.{ParsedOrcfaxDatum, RawOrcfaxDatum, get_parsed_orcfax_datum}
 use types.{
   AssetClass, BridgeDatum, ChoiceDict, ChoiceId, IChoice, INotify, MarloweInput,
-  MarloweTxInput, ParsedOrcfaxDatum, PartyAddress, PartyRole, RawOrcfaxDatum,
-  TxInput, get_parsed_orcfax_datum,
+  MarloweTxInput, PartyAddress, PartyRole, TxInput,
 }
 
 /// `lookup_and_check_bridge` function
