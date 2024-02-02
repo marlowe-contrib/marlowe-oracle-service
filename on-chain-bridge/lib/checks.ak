@@ -1,17 +1,15 @@
 use aiken/bytearray
 use aiken/dict
-use aiken/interval
 use aiken/list
 use aiken/option
 use aiken/transaction.{
-  Datum, InlineDatum, Input, NoDatum, Output, OutputReference, Redeemer,
-  ScriptContext, Spend, Transaction, TransactionId,
+  InlineDatum, Input, NoDatum, Output, OutputReference, Redeemer, ScriptContext,
+  Spend, Transaction, TransactionId,
 }
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
 use aiken/transaction/value.{AssetName, MintedValue, PolicyId, Value}
-use oracles/charli3.{C3Datum, Price, Prices, parse_price_dict}
 use types.{
   AssetClass, BridgeDatum, ChoiceDict, ChoiceId, IChoice, INotify, MarloweInput,
   MarloweTxInput, PartyAddress, PartyRole, TxInput,
@@ -100,50 +98,6 @@ pub fn lookup_and_check_marlowe(
       Some((marlowe_input.output, marlowe_redeemer))
     }
     _more_than_one -> fail @"More than one marlowe input found"
-  }
-}
-
-/// `lookup_charli3_feed` function
-///
-/// This function checks if there's a single charli3 reference input in the
-/// transaction. It parses it's datum and returns the feed price if it valid
-///
-/// # Parameters:
-/// - `c3_addr`: The address of the charli3 validator
-/// - `c3_policy_id`: The policy ID of the charli3 tokens corresponding to the
-///     feed we are looking for
-/// - `c3_token_name`: The token name of the charli3 token corresponding to the
-///     feed we are looking for
-/// - `ctx`: The script context
-///
-/// # Returns
-/// - The feed price if it is contained in the datum and it's valid,according to
-///    the tx validity interval.
-pub fn lookup_charli3_feed(
-  c3_addr: Address,
-  c3_policy_id: PolicyId,
-  c3_token_name: AssetName,
-  ctx: ScriptContext,
-) -> Int {
-  expect [c3_input]: List<Input> =
-    ctx.transaction.reference_inputs
-      |> list.filter(fn(input) { input.output.address == c3_addr })
-  expect 1 =
-    c3_input.output.value |> value.quantity_of(c3_policy_id, c3_token_name)
-
-  expect InlineDatum(d): Datum = c3_input.output.datum
-  expect C3Datum(Prices(p_dict)): C3Datum = d
-
-  let Price(price, invalid_before, invalid_hereafter) = parse_price_dict(p_dict)
-
-  let validity_interval = ctx.transaction.validity_range
-  let cb = interval.is_entirely_before(validity_interval, invalid_hereafter)
-  let ca = interval.is_entirely_after(validity_interval, invalid_before)
-
-  if ca && cb {
-    price
-  } else {
-    fail @"Found c3 feed but it's expired or not valid yet"
   }
 }
 
