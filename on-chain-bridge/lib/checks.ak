@@ -9,7 +9,7 @@ use aiken/transaction.{
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
-use aiken/transaction/value.{AssetName, MintedValue, PolicyId, Value}
+use aiken/transaction/value.{AssetName, MintedValue, Value}
 use types.{
   AssetClass, BridgeDatum, ChoiceDict, ChoiceId, IChoice, INotify, MarloweInput,
   MarloweTxInput, PartyAddress, PartyRole, TxInput,
@@ -99,14 +99,6 @@ pub fn lookup_and_check_marlowe(
     }
     _more_than_one -> fail @"More than one marlowe input found"
   }
-}
-
-pub fn lookup_orcfax_feed(
-  _orcfax_addr: Address,
-  _orcfax_policy_id: PolicyId,
-  _ctx: ScriptContext,
-) -> Option<(Int, Int)> {
-  None
 }
 
 /// function `check_bridge_utxo`

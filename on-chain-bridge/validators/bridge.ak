@@ -6,9 +6,10 @@ use aiken/transaction/value.{AssetName, PolicyId}
 use checks.{
   check_bridge_destroy_utxo, check_bridge_utxo, check_choice,
   check_marlowe_has_thread_token, lookup_and_check_bridge,
-  lookup_and_check_marlowe, lookup_orcfax_feed,
+  lookup_and_check_marlowe,
 }
 use oracles/charli3.{lookup_charli3_feed}
+use oracles/orcfax.{lookup_orcfax_feed}
 use types.{ChoiceDict}
 
 validator(
@@ -52,6 +53,7 @@ validator(
   marlowe_address: Address,
   orcfax_address: Address,
   orcfax_policy_id: PolicyId,
+  orcfax_feed_name: ByteArray,
   choice_names: (ByteArray, ByteArray),
 ) {
   fn orcfax_bridge(datum: Data, redeemer: Bool, ctx: ScriptContext) -> Bool {
@@ -60,20 +62,25 @@ validator(
       expect Some((input_marlowe, redeemer_marlowe)) = opt_marlowe
       expect Some((input_bridge, output_bridge, tn_role_token, thread_token)) =
         lookup_and_check_bridge(ctx)
-      expect Some((feed1, feed2)) =
-        lookup_orcfax_feed(orcfax_address, orcfax_policy_id, ctx)
+      let (feed_1, feed_2) =
+        lookup_orcfax_feed(
+          orcfax_address,
+          orcfax_policy_id,
+          orcfax_feed_name,
+          ctx,
+        )
       let (choice_name_1, choice_name_2) = choice_names
 
       let choice_value_dict: ChoiceDict =
         dict.new()
           |> dict.insert(
                key: choice_name_1,
-               value: feed1,
+               value: feed_1,
                compare: bytearray.compare,
              )
           |> dict.insert(
                key: choice_name_2,
-               value: feed2,
+               value: feed_2,
                compare: bytearray.compare,
              )
 
