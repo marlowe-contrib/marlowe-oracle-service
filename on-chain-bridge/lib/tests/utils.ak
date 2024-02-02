@@ -1,6 +1,7 @@
+use aiken/dict
 use aiken/transaction.{
-  InlineDatum, Input, Output, OutputReference, ScriptContext, Spend, Transaction,
-  TransactionId,
+  InlineDatum, Input, Output, OutputReference, ScriptContext, ScriptPurpose,
+  Spend, Transaction, TransactionId,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{AssetName}
@@ -64,13 +65,29 @@ pub fn mk_script_context(destroy d: Bool) -> ScriptContext {
       output: mk_output("00", "Oracle Token"),
     }
   let marlowe_out_ref =
-    OutputReference { transaction_id: TransactionId(""), output_index: 1 }
+    OutputReference { transaction_id: TransactionId("123"), output_index: 1 }
 
   let marlowe_input =
     Input {
       output_reference: marlowe_out_ref,
       output: mk_output("99", "Thread Token"),
     }
+  let redeemer_value: Data =
+    [
+      mk_choice_input(
+        c_name: "Oracle ADAUSD",
+        role: "Oracle Token",
+        c_num: 495120,
+      ),
+    ]
+
+  let redeemer =
+    dict.new()
+      |> dict.insert(
+           key: Spend(marlowe_out_ref),
+           value: redeemer_value,
+           compare: compare,
+         )
 
   let (outputs, signer) =
     when d is {
@@ -87,6 +104,19 @@ pub fn mk_script_context(destroy d: Bool) -> ScriptContext {
       |> fn(transaction) { Transaction { ..transaction, outputs: outputs } }
       |> fn(transaction) {
            Transaction { ..transaction, extra_signatories: signer }
-         },
+         }
+      |> fn(transaction) { Transaction { ..transaction, redeemers: redeemer } },
+  }
+}
+
+fn compare(left: ScriptPurpose, right: ScriptPurpose) -> Ordering {
+  expect Spend(l) = left
+  expect Spend(r) = right
+  if l.output_index < r.output_index {
+    Less
+  } else if l.output_index > r.output_index {
+    Greater
+  } else {
+    Equal
   }
 }
