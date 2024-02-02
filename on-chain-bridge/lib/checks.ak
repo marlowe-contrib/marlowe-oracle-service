@@ -5,7 +5,7 @@ use aiken/transaction.{
   InlineDatum, Input, Output, Redeemer, ScriptContext, Spend, Transaction,
 }
 use aiken/transaction/credential.{Address}
-use aiken/transaction/value.{AssetName, PolicyId}
+use aiken/transaction/value.{AssetName}
 use types.{
   AssetClass, BridgeDatum, ChoiceDict, ChoiceId, IChoice, MarloweInput,
   PartyRole, TxInput,
