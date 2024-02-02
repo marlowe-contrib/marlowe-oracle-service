@@ -118,7 +118,7 @@ fn get_orcfax_values(raw_datum: RawOrcfaxDatum) -> Option<(Int, Int)> {
            expect l: List<OrcfaxValue> = value
            let parsed_list =
              list.map(l, parse_orcfax_num)
-               |> map_option
+               |> list.filter_map(fn(a) { a })
            when parsed_list is {
              [feed1, feed2] -> Some((feed1, feed2))
              _other -> None
@@ -145,9 +145,10 @@ fn get_orcfax_reference(
     |> option.map(
          fn(value) {
            expect o_val_ref: List<Dict<ByteArray, Data>> = value
-           let ble: List<TimeConstraints> =
-             list.map(o_val_ref, parse_orcfax_reference_dict) |> map_option
-           when ble is {
+           let time_constraints: List<TimeConstraints> =
+             list.map(o_val_ref, parse_orcfax_reference_dict)
+               |> list.filter_map(fn(a) { a })
+           when time_constraints is {
              [ValidFrom(vf), ValidThrough(vt)] -> Some((vf, vt))
              [ValidThrough(vt), ValidFrom(vf)] -> Some((vf, vt))
              _otherwhise -> None
@@ -194,7 +195,7 @@ fn parse_orcfax_reference_dict(
 
 /// `parse_orcfax_num` function
 ///
-/// Parses the feed values stored in the significant, exponenet format.
+/// Parses the feed values stored in the significant, exponent format.
 ///
 /// # Parameters:
 /// - `value`: The orcfax value.
@@ -225,29 +226,6 @@ fn parse_orcfax_num(value: OrcfaxValue) -> Option<Int> {
     }
     _other -> None
   }
-}
-
-/// `map_option` function
-///
-/// Given a list of options, drop the None elements and unwrap the Some elements
-///
-/// # Parameters:
-/// - `l`: The list to map over.
-///
-/// # Returns
-/// - The new list without options
-fn map_option(l: List<Option<a>>) -> List<a> {
-  list.foldl(
-    l,
-    [],
-    fn(elem, acc) {
-      when elem is {
-        Some(a) -> list.push(acc, a)
-        None -> acc
-      }
-    },
-  )
-    |> list.reverse
 }
 
 /// `lookup_orcfax_feed` function
