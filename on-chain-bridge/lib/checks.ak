@@ -101,15 +101,6 @@ pub fn lookup_and_check_marlowe(
   }
 }
 
-pub fn lookup_charli3_feed(
-  _c3_addr: Address,
-  _c3_policy_id: PolicyId,
-  _c3_token_name: AssetName,
-  _ctx: ScriptContext,
-) -> Option<Int> {
-  None
-}
-
 pub fn lookup_orcfax_feed(
   _orcfax_addr: Address,
   _orcfax_policy_id: PolicyId,
@@ -228,8 +219,7 @@ test check_marlowe_has_thread_token_no_token() fail {
       stake_credential: None,
     }
   let asset_class = AssetClass { policy: #"01", name: "Thread Token" }
-  let marlowe_value =
-    value.from_lovelace(1000000)
+  let marlowe_value = value.from_lovelace(1000000)
   let output =
     Output {
       address: marlowe_address,

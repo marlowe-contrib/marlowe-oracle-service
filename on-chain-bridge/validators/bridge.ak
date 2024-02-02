@@ -6,8 +6,9 @@ use aiken/transaction/value.{AssetName, PolicyId}
 use checks.{
   check_bridge_destroy_utxo, check_bridge_utxo, check_choice,
   check_marlowe_has_thread_token, lookup_and_check_bridge,
-  lookup_and_check_marlowe, lookup_charli3_feed, lookup_orcfax_feed,
+  lookup_and_check_marlowe, lookup_orcfax_feed,
 }
+use oracles/charli3.{lookup_charli3_feed}
 use types.{ChoiceDict}
 
 validator(
@@ -23,7 +24,7 @@ validator(
       expect Some((input_marlowe, redeemer_marlowe)) = opt_marlowe
       expect Some((input_bridge, output_bridge, tn_role_token, thread_token)) =
         lookup_and_check_bridge(ctx)
-      expect Some(feed) =
+      let feed =
         lookup_charli3_feed(
           charli3_address,
           charli3_policy_id,
