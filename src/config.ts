@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import { Command } from 'commander';
+import { Command, OptionValues } from 'commander';
 import figlet from 'figlet';
 
 import { Address, ChoiceName } from 'marlowe-language-core-v1-txpipe';
@@ -16,7 +16,13 @@ import {
 } from 'lucid-cardano';
 
 import { ConfigError } from './error.ts';
-import { configLogger } from './logger.ts';
+import {
+    mosLogger,
+    configLogger,
+    scanLogger,
+    feedLogger,
+    txLogger,
+} from './logger.ts';
 import { PolicyId } from 'marlowe-language-core-v1-txpipe';
 
 /**
@@ -173,8 +179,12 @@ export async function parseMOSConfig(): Promise<MOSConfig<OutRef>> {
         }
     );
 
+    program.option('--debug');
+
     try {
         program.parse(process.argv);
+        const options = program.opts();
+        configLoggerMinLevel(options);
     } catch (error) {
         configLogger.error(error);
     }
@@ -384,4 +394,18 @@ export async function setMarloweUTxO(
         ...mosenv,
         marloweValidatorUtxo: validatorUtxo,
     };
+}
+
+/**
+ * Configures the minimal logging level of every logger.
+ * @param opts Record specifying the `debug` level.
+ */
+function configLoggerMinLevel(opts: OptionValues) {
+    const logLevel = opts.debug ? 2 : 3;
+
+    mosLogger.settings.minLevel = logLevel;
+    configLogger.settings.minLevel = logLevel;
+    scanLogger.settings.minLevel = logLevel;
+    feedLogger.settings.minLevel = logLevel;
+    txLogger.settings.minLevel = logLevel;
 }
