@@ -6,9 +6,10 @@ use aiken/transaction/value.{AssetName, PolicyId}
 use checks.{
   check_bridge_destroy_utxo, check_bridge_utxo, check_choice,
   check_marlowe_has_thread_token, lookup_and_check_bridge,
-  lookup_and_check_marlowe, lookup_orcfax_feed,
+  lookup_and_check_marlowe,
 }
 use oracles/charli3.{lookup_charli3_feed}
+use oracles/orcfax.{lookup_orcfax_feed}
 use types.{ChoiceDict}
 
 validator(
