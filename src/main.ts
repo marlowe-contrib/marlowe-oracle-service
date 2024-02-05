@@ -26,8 +26,8 @@ export async function main() {
         const mosConfig = await setOracleConfig(rawMosConfig, lucid);
         const mosEnv = await setMarloweUTxO(rawMosEnv, lucid);
 
-        configLogger.debug(mosConfig);
-        configLogger.debug(mosEnv);
+        configLogger.info(mosConfig);
+        configLogger.info(mosEnv);
 
         do {
             const activeContracts = await getActiveContracts(
