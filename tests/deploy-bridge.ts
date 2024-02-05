@@ -1,11 +1,8 @@
 import {
-    Address,
-    AddressDetails,
     Constr,
     Data,
     Lucid,
     Script,
-    applyDoubleCborEncoding,
     applyParamsToScript,
     fromText,
 } from 'lucid-cardano';

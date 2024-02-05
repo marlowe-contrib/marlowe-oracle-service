@@ -183,9 +183,24 @@ try {
 
         newTx.attachMintingPolicy(mintingPolicy);
 
+        const BridgeDatumSchema = Data.Object({
+            pkh: Data.Bytes(),
+            token_name: Data.Bytes()
+        })
+        type BridgeDatum = Data.Static<typeof BridgeDatumSchema>;
+        const BridgeDatum = BridgeDatumSchema as unknown as BridgeDatum;
+
+        const datumPayment = lucid.utils.paymentCredentialOf(await lucid.wallet.address())
+
+        const bridgeDatum = {
+            pkh: datumPayment.hash,
+            token_name: fromText('Thread Token')
+        }
+        const datum = Data.to<BridgeDatum>(bridgeDatum, BridgeDatum)
+
         newTx.payToAddressWithData(
-            'addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu',
-            { asHash: Data.to(fromText('Thread Token')) },
+            'addr_test1wqjj9fheym5cd9lyrj5ddlndlclrjk5jxdvx4mv3lmrs82sl5k0m8',
+            { inline: datum },
             { [oracleTokenAsset]: 1n }
         );
 
