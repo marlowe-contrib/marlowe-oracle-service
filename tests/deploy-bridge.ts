@@ -31,8 +31,8 @@ const charli3Payment = lucid.utils.paymentCredentialOf(
 
 function mkAddress(payment: string): Data {
     return new Constr(0, [
-        new Constr(0, [payment]),
-        new Constr(0, []),
+        new Constr(1, [payment]),
+        new Constr(1, []),
     ]);
 }
 
@@ -42,7 +42,7 @@ const charli3Address = mkAddress(charli3Payment)
 const charli3Policy =
     '1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf07';
 const charli3Name = '4f7261636c6546656564';
-const charli3Choice = fromText('Charli3 Oracle');
+const charli3Choice = fromText('Charli3 ADAUSD');
 
 const charli3Bridge: Script = {
     type: 'PlutusV2',

@@ -199,7 +199,7 @@ try {
         const datum = Data.to<BridgeDatum>(bridgeDatum, BridgeDatum)
 
         newTx.payToAddressWithData(
-            'addr_test1wqjj9fheym5cd9lyrj5ddlndlclrjk5jxdvx4mv3lmrs82sl5k0m8',
+            'addr_test1wqzctdkgz09pjmm9lfz4crfnpqha9yw4nc0eavwf45ul5xgp54k6h',
             { inline: datum },
             { [oracleTokenAsset]: 1n }
         );

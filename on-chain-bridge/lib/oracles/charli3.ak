@@ -115,7 +115,7 @@ pub fn lookup_charli3_feed(
   let cb = interval.is_entirely_before(validity_interval, invalid_hereafter)
   let ca = interval.is_entirely_after(validity_interval, invalid_before)
 
-  if ca && cb {
+  if ca? && cb? {
     price
   } else {
     fail @"Found c3 feed but it's expired or not valid yet"
