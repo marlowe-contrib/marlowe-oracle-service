@@ -10,7 +10,7 @@ use checks.{
 }
 use oracles/charli3.{lookup_charli3_feed}
 use oracles/orcfax.{lookup_orcfax_feed}
-use types.{ChoiceDict}
+use types.{BridgeDatum, ChoiceDict}
 
 validator(
   marlowe_address: Address,
@@ -19,7 +19,11 @@ validator(
   charli3_token_name: AssetName,
   choice_name: ByteArray,
 ) {
-  fn charli3_bridge(datum: Data, redeemer: Bool, ctx: ScriptContext) -> Bool {
+  fn charli3_bridge(
+    datum: BridgeDatum,
+    redeemer: Bool,
+    ctx: ScriptContext,
+  ) -> Bool {
     let opt_marlowe = lookup_and_check_marlowe(marlowe_address, ctx)
     if redeemer {
       expect Some((input_marlowe, redeemer_marlowe)) = opt_marlowe
@@ -56,7 +60,11 @@ validator(
   orcfax_feed_name: ByteArray,
   choice_names: (ByteArray, ByteArray),
 ) {
-  fn orcfax_bridge(datum: Data, redeemer: Bool, ctx: ScriptContext) -> Bool {
+  fn orcfax_bridge(
+    datum: BridgeDatum,
+    redeemer: Bool,
+    ctx: ScriptContext,
+  ) -> Bool {
     let opt_marlowe = lookup_and_check_marlowe(marlowe_address, ctx)
     if redeemer {
       expect Some((input_marlowe, redeemer_marlowe)) = opt_marlowe

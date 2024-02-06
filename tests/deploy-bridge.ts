@@ -28,6 +28,9 @@ const marlowePayment = lucid.utils.paymentCredentialOf(
 const charli3Payment = lucid.utils.paymentCredentialOf(
     'addr_test1wzn5ee2qaqvly3hx7e0nk3vhm240n5muq3plhjcnvx9ppjgf62u6a'
 ).hash;
+const orcfaxPayment = lucid.utils.paymentCredentialOf(
+    'addr_test1wrtcecfy7np3sduzn99ffuv8qx2sa8v977l0xql8ca7lgkgmktuc0'
+).hash;
 
 function mkAddress(payment: string): Data {
     return new Constr(0, [
@@ -36,8 +39,20 @@ function mkAddress(payment: string): Data {
     ]);
 }
 
+function mkOrcfaxTuple(cn1: string, cn2: string): Data {
+    return new Array(
+        fromText(cn1),
+        fromText(cn2)
+    )
+}
+
 const marloweAddress = mkAddress(marlowePayment)
 const charli3Address = mkAddress(charli3Payment)
+const orcfaxAddress = mkAddress(orcfaxPayment)
+
+const orcfaxPolicy = '104d51dd927761bf5d50d32e1ede4b2cff477d475fe32f4f780a4b21';
+const orcfaxFeedName = fromText('ADA-USD|USD-ADA');
+const orcfaxChoices = mkOrcfaxTuple('Orcfax ADAUSD', 'OrcfaxUSDADA');
 
 const charli3Policy =
     '1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf07';
@@ -55,9 +70,25 @@ const charli3Bridge: Script = {
     ]),
 };
 
+const orcfaxBridge: Script = {
+    type: 'PlutusV2',
+    script: applyParamsToScript(orcfaxCompiled, [
+        marloweAddress,
+        orcfaxAddress,
+        orcfaxPolicy,
+        orcfaxFeedName,
+        orcfaxChoices,
+    ]),
+};
+
 const charli3BridgeAddress = lucid.utils.validatorToAddress(charli3Bridge);
-console.log('Script Address: ', charli3BridgeAddress);
+console.log('Charli3 Script Address: ', charli3BridgeAddress);
 console.log(charli3Bridge.script)
+console.log('')
+console.log('')
+const orcfaxBridgeAddress = lucid.utils.validatorToAddress(orcfaxBridge);
+console.log('Orcfax Script Address: ', orcfaxBridgeAddress);
+console.log(orcfaxBridge.script)
 
 const BridgeDatumSchema = Data.Object({
     pkh: Data.Bytes(),
