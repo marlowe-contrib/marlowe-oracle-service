@@ -185,18 +185,20 @@ try {
 
         const BridgeDatumSchema = Data.Object({
             pkh: Data.Bytes(),
-            token_name: Data.Bytes()
-        })
+            token_name: Data.Bytes(),
+        });
         type BridgeDatum = Data.Static<typeof BridgeDatumSchema>;
         const BridgeDatum = BridgeDatumSchema as unknown as BridgeDatum;
 
-        const datumPayment = lucid.utils.paymentCredentialOf(await lucid.wallet.address())
+        const datumPayment = lucid.utils.paymentCredentialOf(
+            await lucid.wallet.address()
+        );
 
         const bridgeDatum = {
             pkh: datumPayment.hash,
-            token_name: fromText('Thread Token')
-        }
-        const datum = Data.to<BridgeDatum>(bridgeDatum, BridgeDatum)
+            token_name: fromText('Thread Token'),
+        };
+        const datum = Data.to<BridgeDatum>(bridgeDatum, BridgeDatum);
 
         newTx.payToAddressWithData(
             'addr_test1wrgrr6rrp3n2kauhw236ae2ekznyvf7czs2vqdvzn7ppdhs94vzyf',
