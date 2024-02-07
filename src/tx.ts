@@ -316,19 +316,19 @@ export async function buildAndSubmit(
                                 Data.to(new Constr(1, []))
                             );
 
-                            if (!bridgeUtxo.datumHash)
-                                throw new BuildTransactionError(
-                                    'BridgeUTxOIsMissingDatumHash'
-                                );
-
-                            tx.payToContract(
-                                bridgeUtxo.address,
-                                { hash: bridgeUtxo.datumHash },
-                                bridgeUtxo.assets
+                        if (!bridgeUtxo.datum)
+                            throw new BuildTransactionError(
+                                'BridgeUTxOIsMissingDatum'
                             );
-                        }
 
-                        allTxs.push(tx);
+                        tx.payToContract(
+                            bridgeUtxo.address,
+                            { inline: bridgeUtxo.datum },
+                            bridgeUtxo.assets
+                        );
+                    }
+                    allTxs.push(tx);
+
                     }
                 } else {
                     txLogger.warn(

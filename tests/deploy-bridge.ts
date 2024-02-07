@@ -1,10 +1,12 @@
 import {
+    Assets,
     Constr,
     Data,
     Lucid,
     Script,
     applyParamsToScript,
     fromText,
+    toUnit,
 } from 'lucid-cardano';
 import { parseMOSEnv } from '../src/config.ts';
 
@@ -33,22 +35,16 @@ const orcfaxPayment = lucid.utils.paymentCredentialOf(
 ).hash;
 
 function mkAddress(payment: string): Data {
-    return new Constr(0, [
-        new Constr(1, [payment]),
-        new Constr(1, []),
-    ]);
+    return new Constr(0, [new Constr(1, [payment]), new Constr(1, [])]);
 }
 
 function mkOrcfaxTuple(cn1: string, cn2: string): Data {
-    return new Array(
-        fromText(cn1),
-        fromText(cn2)
-    )
+    return new Array(fromText(cn1), fromText(cn2));
 }
 
-const marloweAddress = mkAddress(marlowePayment)
-const charli3Address = mkAddress(charli3Payment)
-const orcfaxAddress = mkAddress(orcfaxPayment)
+const marloweAddress = mkAddress(marlowePayment);
+const charli3Address = mkAddress(charli3Payment);
+const orcfaxAddress = mkAddress(orcfaxPayment);
 
 const orcfaxPolicy = '104d51dd927761bf5d50d32e1ede4b2cff477d475fe32f4f780a4b21';
 const orcfaxFeedName = fromText('ADA-USD|USD-ADA');
@@ -83,36 +79,55 @@ const orcfaxBridge: Script = {
 
 const charli3BridgeAddress = lucid.utils.validatorToAddress(charli3Bridge);
 console.log('Charli3 Script Address: ', charli3BridgeAddress);
-console.log(charli3Bridge.script)
-console.log('')
-console.log('')
+console.log(charli3Bridge.script);
+console.log('');
+console.log('');
 const orcfaxBridgeAddress = lucid.utils.validatorToAddress(orcfaxBridge);
 console.log('Orcfax Script Address: ', orcfaxBridgeAddress);
-console.log(orcfaxBridge.script)
+console.log(orcfaxBridge.script);
 
 const BridgeDatumSchema = Data.Object({
     pkh: Data.Bytes(),
-    token_name: Data.Bytes()
-})
+    token_name: Data.Bytes(),
+});
 type BridgeDatum = Data.Static<typeof BridgeDatumSchema>;
 const BridgeDatum = BridgeDatumSchema as unknown as BridgeDatum;
 
-const datumPayment = lucid.utils.paymentCredentialOf(await lucid.wallet.address())
+const datumPayment = lucid.utils.paymentCredentialOf(
+    await lucid.wallet.address()
+);
 
 const bridgeDatum = {
     pkh: datumPayment.hash,
-    token_name: fromText('Thread Token')
-}
-const datum = Data.to<BridgeDatum>(bridgeDatum, BridgeDatum)
+    token_name: fromText('Thread Token'),
+};
+const datum = Data.to<BridgeDatum>(bridgeDatum, BridgeDatum);
 
-// const tx = await lucid
-//     .newTx()
-//     .payToContract(
-//         charli3BridgeAddress,
-//         { inline: datum },
-//         { lovelace: BigInt(1000000) }
-//     )
-//     .complete();
-// const txSigned = await tx.sign().complete();
-// const txHash = await txSigned.submit();
-// console.log(`Transaction submitted. TxHash: ${txHash}`);
+const spendScript: Script = {
+    type: 'PlutusV2',
+    script: "587c0100003232323232323232322223253330083253330093370e90000008a5114a0600e0022930b1900199299980419b874800000454ccc02cc028dd50018a4c2c2c600c0046600200290001111199980319b8700100300a233330050053370000890011806000801001118019baa0015734aae7555cf2ab9f5742ae89"
+}
+
+const spendAddress = lucid.utils.validatorToAddress(spendScript);
+
+const utxos = await lucid.utxosAt(spendAddress);
+const redeemer = Data.to(new Constr(0, []));
+
+const tx = await lucid
+    .newTx()
+    .collectFrom(utxos, redeemer)
+    .payToContract(
+        spendAddress,
+        { inline: Data.void(), scriptRef: charli3Bridge },
+        {}
+    )
+    .payToContract(
+        spendAddress,
+        { inline: Data.void(), scriptRef: orcfaxBridge },
+        {}
+    )
+    .attachSpendingValidator(spendScript)
+    .complete();
+const txSigned = await tx.sign().complete();
+const txHash = await txSigned.submit();
+console.log(`Transaction submitted. TxHash: ${txHash}`);

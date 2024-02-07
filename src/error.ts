@@ -98,7 +98,7 @@ type BuildTransactionErrorNames =
     | 'MoreThanOneMarloweContractOutput'
     | 'NoDatumFoundOnUTxO'
     | 'NoBridgeValidatorUTxOConfigured'
-    | 'BridgeUTxOIsMissingDatumHash';
+    | 'BridgeUTxOIsMissingDatum';
 
 /**
  * Http requests errors.
