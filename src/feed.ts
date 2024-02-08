@@ -41,7 +41,15 @@ type CurrencyPair = {
     to: Currency;
 };
 
-type PriceMap = Record<string, Option<[bigint, Option<UTxO>]>>;
+type PriceMap = Record<
+    string,
+    Option<[bigint, Option<[UTxO, ValidityInterval]>]>
+>;
+
+export type ValidityInterval = {
+    validFrom: bigint;
+    validThrough: bigint;
+};
 
 export type ApplyInputsToContractRequest = {
     contractId: ContractId;
@@ -50,7 +58,7 @@ export type ApplyInputsToContractRequest = {
     invalidBefore: Date;
     invalidHereafter: Date;
     bridgeUtxo: Option<UTxO>;
-    oracleUtxo: Option<UTxO>;
+    oracleUtxo: Option<[UTxO, ValidityInterval]>;
 };
 
 /**
@@ -133,7 +141,7 @@ function prettyInputs(inputs: Input[]): [ChoiceName, ChosenNum][] {
 async function feed(
     request: OracleRequest,
     priceMap: PriceMap
-): Promise<[Input, Option<UTxO>]> {
+): Promise<[Input, Option<[UTxO, ValidityInterval]>]> {
     try {
         const cn = request.choiceId.choice_name;
         const curPair = KnownCurrencyPairs.get(cn);
@@ -293,7 +301,10 @@ async function setPriceMap(
         const curPair = KnownCurrencyPairs.get(cn);
         if (!curPair) throw new FeedError('UnknownCurrencyPairOrSource');
 
-        let [price, utxo]: [bigint, Option<UTxO>] = [0n, none];
+        let [price, utxo]: [bigint, Option<[UTxO, ValidityInterval]>] = [
+            0n,
+            none,
+        ];
         try {
             switch (curPair.source) {
                 case 'Coingecko':
@@ -340,7 +351,7 @@ async function setPriceMap(
 async function getCharli3Price(
     c3Config: OracleConfig<UTxO>,
     lucid: Lucid
-): Promise<[bigint, Option<UTxO>]> {
+): Promise<[bigint, Option<[UTxO, ValidityInterval]>]> {
     const charli3Unit = toUnit(c3Config.feedPolicyId, c3Config.feedTokenName);
     const charli3Utxo = await lucid.utxoByUnit(charli3Unit);
 
@@ -348,9 +359,12 @@ async function getCharli3Price(
     if (!charli3Utxo.datum)
         throw new FeedError('UtxoWOracleFeedDoesNotHaveDatum');
 
-    const price: bigint = parseCharli3Price(charli3Utxo.datum);
+    const charli3Data = parseCharli3Price(charli3Utxo.datum);
 
-    return [price, some(charli3Utxo)];
+    return [
+        charli3Data.price,
+        some([charli3Utxo, charli3Data.validityInterval]),
+    ];
 }
 
 /**
@@ -358,7 +372,10 @@ async function getCharli3Price(
  * @param datum Datum of the Oracle Feed UTxO
  * @returns Exchange rate for ADAUSD
  */
-function parseCharli3Price(datum: Datum): bigint {
+export function parseCharli3Price(datum: Datum): {
+    price: bigint;
+    validityInterval: ValidityInterval;
+} {
     const date = new Date();
     let data = Data.from<Data>(datum);
     if (data instanceof Constr && data.index === 0) {
@@ -367,7 +384,13 @@ function parseCharli3Price(datum: Datum): bigint {
             let data3 = data2.fields[0];
             if (data3 instanceof Map) {
                 if ((data3.get(BigInt(2)) as bigint) > date.getTime()) {
-                    return data3.get(BigInt(0)) as bigint;
+                    return {
+                        price: data3.get(BigInt(0)) as bigint,
+                        validityInterval: {
+                            validFrom: data3.get(BigInt(1)) as bigint,
+                            validThrough: data3.get(BigInt(2)) as bigint,
+                        },
+                    };
                 } else {
                     throw new FeedError('Charli3PriceExpired');
                 }
@@ -394,7 +417,7 @@ function parseCharli3Price(datum: Datum): bigint {
 export async function getOrcfaxPrice(
     ofConfig: OracleConfig<UTxO>,
     lucid: Lucid
-): Promise<[bigint, Option<UTxO>]> {
+): Promise<[bigint, Option<[UTxO, ValidityInterval]>]> {
     const orcFaxUtxos = await lucid.utxosAt(ofConfig.feedAddress);
 
     const feedUtxos = orcFaxUtxos.filter(
@@ -435,7 +458,10 @@ export async function getOrcfaxPrice(
             () => {
                 throw new FeedError('UtxoWOracleFeedNotFound');
             },
-            (result) => [parseOrcfaxPrice(result[1]), some(result[0])]
+            (result) => [
+                parseOrcfaxPrice(result[1]),
+                some([result[0], parseOrcfaxValidTime(result[1])]),
+            ]
         )
     );
 }
@@ -497,10 +523,7 @@ function decodePrice(sig: bigint, exp: bigint): number {
  * @param raw_datum Datum of the Orcfax feed UTxO
  * @returns The timestamps the mark the validity interval of the price.
  */
-function parseOrcfaxValidTime(raw_datum: Datum): {
-    validFrom: bigint;
-    validThrough: bigint;
-} {
+export function parseOrcfaxValidTime(raw_datum: Datum): ValidityInterval {
     let data = Data.from<Data>(raw_datum);
     if (data instanceof Constr && data.index === 0) {
         let data2 = data.fields[0];
