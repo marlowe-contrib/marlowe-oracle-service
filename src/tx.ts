@@ -537,7 +537,8 @@ function checkValidityInterval(
     interval: ValidityInterval,
     req: ApplyInputsToContractRequest
 ): Boolean {
-    const validityBefore = req.invalidHereafter.getTime() < interval.validThrough;
-    const validityAfter = req.invalidBefore.getTime() > interval.validFrom ;
+    const validityBefore =
+        req.invalidHereafter.getTime() < interval.validThrough;
+    const validityAfter = req.invalidBefore.getTime() > interval.validFrom;
     return validityBefore && validityAfter;
 }
