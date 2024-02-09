@@ -526,12 +526,18 @@ function isIncluded(ref: OutRef, inputs: C.TransactionInputs): Boolean {
     return false;
 }
 
+/**
+ * Utility to check if the given interval for the transaction falls within the
+ * validity bounds of the Oracle Feed
+ * @param interval validity interval of the oracle feed
+ * @param req apply inputs request that has the validity interval that will be set for the tx
+ * @returns whether the transaction's interval is within the Oracle Feed's or not
+ */
 function checkValidityInterval(
     interval: ValidityInterval,
     req: ApplyInputsToContractRequest
 ): Boolean {
-    const validityBefore =
-        interval.validThrough < req.invalidHereafter.getTime();
-    const validityAfter = interval.validFrom > req.invalidBefore.getTime();
+    const validityBefore = req.invalidHereafter.getTime() < interval.validThrough;
+    const validityAfter = req.invalidBefore.getTime() > interval.validFrom ;
     return validityBefore && validityAfter;
 }

@@ -284,7 +284,8 @@ function makeInput(cId: ChoiceId, price: bigint): Input {
  * Queries and creates a map that stores the price for every ChoiceName, to
  * avoid having to query the source multiple times for the same choice names.
  * @param requests List of Oracle Requests
- * @returns Record containing the price for each ChoiceName
+ * @returns Record containing the price for each ChoiceName, and an Option
+ * containing the Oracle Feed's UTxO, and it's validity Interval, or None.
  */
 async function setPriceMap(
     requests: OracleRequest[],
@@ -370,7 +371,7 @@ async function getCharli3Price(
 /**
  * Utility to parse the datum of the Charli3 Oracle Feed UTxO to read the price.
  * @param datum Datum of the Oracle Feed UTxO
- * @returns Exchange rate for ADAUSD
+ * @returns Exchange rate for ADAUSD, and the vality Interval for that price
  */
 export function parseCharli3Price(datum: Datum): {
     price: bigint;
