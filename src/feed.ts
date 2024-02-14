@@ -58,6 +58,7 @@ export type ApplyInputsToContractRequest = {
     invalidBefore: Date;
     invalidHereafter: Date;
     bridgeUtxo: Option<UTxO>;
+    bridgeValidatorUtxo: Option<UTxO>;
     oracleUtxo: Option<[UTxO, ValidityInterval]>;
 };
 
@@ -99,6 +100,7 @@ export async function getApplyInputs(
             invalidBefore: request.invalidBefore,
             invalidHereafter: request.invalidHereafter,
             bridgeUtxo: request.bridgeUtxo,
+            bridgeValidatorUtxo: request.bridgeValidatorUtxo,
             oracleUtxo: utxo,
         };
         return air;

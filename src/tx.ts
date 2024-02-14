@@ -277,8 +277,7 @@ export async function buildAndSubmit(
     client: RestClient,
     lucid: Lucid,
     applicableInputs: ApplyInputsToContractRequest[],
-    mosEnv: MOSEnv<UTxO>,
-    bridgeValidatorUtxo: Option<UTxO>
+    mosEnv: MOSEnv<UTxO>
 ): Promise<void> {
     const submitted: string[] = [];
     if (applicableInputs.length > 0) {
@@ -306,23 +305,23 @@ export async function buildAndSubmit(
                             tx.readFrom([req.oracleUtxo.value[0]]);
                         }
 
-                        if (isSome(req.bridgeUtxo)) {
-                            if (isNone(bridgeValidatorUtxo))
-                                throw new BuildTransactionError(
-                                    'NoBridgeValidatorUTxOConfigured'
-                                );
+                    if (isSome(req.bridgeUtxo)) {
+                        if (isNone(req.bridgeValidatorUtxo))
+                            throw new BuildTransactionError(
+                                'NoBridgeValidatorUTxOConfigured'
+                            );
 
-                            tx.readFrom([bridgeValidatorUtxo.value]);
+                        tx.readFrom([req.bridgeValidatorUtxo.value]);
 
                             tx.collectFrom(
                                 [req.bridgeUtxo.value],
                                 Data.to(new Constr(1, []))
                             );
 
-                            if (!req.bridgeUtxo.value.datumHash)
-                                throw new BuildTransactionError(
-                                    'BridgeUTxOIsMissingDatumHash'
-                                );
+                        if (!req.bridgeUtxo.value.datumHash)
+                            throw new BuildTransactionError(
+                                'BridgeUTxOIsMissingDatumHash'
+                            );
 
                             tx.payToContract(
                                 req.bridgeUtxo.value.address,

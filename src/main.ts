@@ -48,9 +48,6 @@ export async function main() {
                 lucid,
                 applicableInputs,
                 mosEnv,
-                fromNullable(
-                    mosConfig.resolveMethod.charli3?.bridgeValidatorUtxo
-                )
             );
 
             await new Promise((r) => setTimeout(r, mosConfig.delay));
