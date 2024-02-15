@@ -12,7 +12,7 @@
       "choiceName": "Charli3 ADAUSD",
       "roleName": "Charli3 Oracle",
       "bridgeValidatorUtxo": {
-        "txHash": "6d9ccb38415db7ac647d3b68098658f66dd392364a1ce42fede5a998187576b6",
+        "txHash": "2e5338bbe38f0d826f7626c8a399319da93ae9db10635010457d2e15ca107ed5",
         "outputIndex": 0
       },
       "bridgeAddress": "addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu",
@@ -24,7 +24,7 @@
       "choiceName": "Orcfax ADAUSD",
       "roleName": "Orcfax Oracle",
       "bridgeValidatorUtxo": {
-        "txHash": "6d9ccb38415db7ac647d3b68098658f66dd392364a1ce42fede5a998187576b6",
+        "txHash": "2e5338bbe38f0d826f7626c8a399319da93ae9db10635010457d2e15ca107ed5",
         "outputIndex": 0
       },
       "bridgeAddress": "addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu",

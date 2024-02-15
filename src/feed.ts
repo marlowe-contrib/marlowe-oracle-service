@@ -456,7 +456,10 @@ function parseOrcfaxPrice(raw_datum: Datum): bigint {
                 let data4 = data3[0];
                 if (data4 instanceof Constr && data4.index === 3) {
                     let data5 = data4.fields;
-                    return data5[0] as bigint;
+                    let sig = data5[0] as bigint;
+                    let exp = data5[1] as bigint;
+                    const price = decodePrice(sig, exp);
+                    return BigInt(price);
                 } else {
                     throw new FeedError('UnexpectedOrcfaxDatumShape');
                 }
@@ -469,6 +472,23 @@ function parseOrcfaxPrice(raw_datum: Datum): bigint {
     } else {
         throw new FeedError('UnexpectedOrcfaxDatumShape');
     }
+}
+
+/**
+ * Decodes Orcfax price format as it is encoded in their datum. References:
+ * https://github.com/mlabs-haskell/cardano-open-oracle-protocol/blob/main/coop-docs/05-json-plutus.md?plain=1#L53-L61
+ * https://docs.orcfax.io/Technical-questions
+ * @param sig The signigicant as found in the datum
+ * @param exp The base 10 exponent as found in the datum
+ * @returns The decoded price number. Represented as the real price value
+ * multiplied by 10⁶, as per the MOS standard.
+ */
+
+function decodePrice(sig: bigint, exp: bigint): number {
+    const unsignedSig = Number(sig);
+    const unsignedBase = new BigUint64Array([exp]);
+    const signedBase = new BigInt64Array([unsignedBase[0]]);
+    return Math.floor(unsignedSig * 10 ** (Number(signedBase[0]) + 6));
 }
 
 /**
