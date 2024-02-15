@@ -305,28 +305,28 @@ export async function buildAndSubmit(
                             tx.readFrom([req.oracleUtxo.value[0]]);
                         }
 
-                    if (isSome(req.bridgeUtxo)) {
-                        const [bridgeUtxo, bridgeValidatorUtxo] =
-                            req.bridgeUtxo.value;
+                        if (isSome(req.bridgeUtxo)) {
+                            const [bridgeUtxo, bridgeValidatorUtxo] =
+                                req.bridgeUtxo.value;
 
-                        tx.readFrom([bridgeValidatorUtxo]);
+                            tx.readFrom([bridgeValidatorUtxo]);
 
-                        tx.collectFrom(
-                            [bridgeUtxo],
-                            Data.to(new Constr(1, []))
-                        );
-
-                        if (!bridgeUtxo.datumHash)
-                            throw new BuildTransactionError(
-                                'BridgeUTxOIsMissingDatumHash'
+                            tx.collectFrom(
+                                [bridgeUtxo],
+                                Data.to(new Constr(1, []))
                             );
 
-                        tx.payToContract(
-                            bridgeUtxo.address,
-                            { hash: bridgeUtxo.datumHash },
-                            bridgeUtxo.assets
-                        );
-                    }
+                            if (!bridgeUtxo.datumHash)
+                                throw new BuildTransactionError(
+                                    'BridgeUTxOIsMissingDatumHash'
+                                );
+
+                            tx.payToContract(
+                                bridgeUtxo.address,
+                                { hash: bridgeUtxo.datumHash },
+                                bridgeUtxo.assets
+                            );
+                        }
 
                         allTxs.push(tx);
                     }
