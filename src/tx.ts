@@ -316,18 +316,17 @@ export async function buildAndSubmit(
                                 Data.to(new Constr(1, []))
                             );
 
-                            if (!bridgeUtxo.datumHash)
+                            if (!bridgeUtxo.datum)
                                 throw new BuildTransactionError(
-                                    'BridgeUTxOIsMissingDatumHash'
+                                    'BridgeUTxOIsMissingDatum'
                                 );
 
                             tx.payToContract(
                                 bridgeUtxo.address,
-                                { hash: bridgeUtxo.datumHash },
+                                { inline: bridgeUtxo.datum },
                                 bridgeUtxo.assets
                             );
                         }
-
                         allTxs.push(tx);
                     }
                 } else {

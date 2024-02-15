@@ -110,12 +110,12 @@ export async function getActiveContracts(
 
     const currentTime: Date = new Date();
 
-    const timeBefore5Minutes: Date = new Date(
-        currentTime.getTime() - 5 * 60 * 1000
+    const timeBefore3Minutes: Date = new Date(
+        currentTime.getTime() - 3 * 60 * 1000
     );
 
-    const timeAfter5Minutes: Date = new Date(
-        currentTime.getTime() + 5 * 60 * 1000
+    const timeAfter3Minutes: Date = new Date(
+        currentTime.getTime() + 3 * 60 * 1000
     );
 
     const addressResolvable: OracleRequest[] = [];
@@ -127,7 +127,7 @@ export async function getActiveContracts(
     for (const contract of allContractHeaders) {
         const nextSteps = await client.getNextStepsForContract(
             contract.contractId,
-            mkEnvironment(timeBefore5Minutes)(timeAfter5Minutes),
+            mkEnvironment(timeBefore3Minutes)(timeAfter3Minutes),
             []
         )();
 
@@ -147,8 +147,8 @@ export async function getActiveContracts(
                             contractId: contract.contractId,
                             choiceId: choice.for_choice,
                             choiceBounds: choice.can_choose_between,
-                            invalidBefore: timeBefore5Minutes,
-                            invalidHereafter: timeAfter5Minutes,
+                            invalidBefore: timeBefore3Minutes,
+                            invalidHereafter: timeAfter3Minutes,
                             bridgeUtxo: none,
                         };
 
@@ -250,12 +250,12 @@ async function makeOracleRequests(
 
     const currentTime: Date = new Date();
 
-    const timeBefore5Minutes: Date = new Date(
-        currentTime.getTime() - 5 * 60 * 1000
+    const timeBefore3Minutes: Date = new Date(
+        currentTime.getTime() - 3 * 60 * 1000
     );
 
-    const timeAfter5Minutes: Date = new Date(
-        currentTime.getTime() + 5 * 60 * 1000
+    const timeAfter3Minutes: Date = new Date(
+        currentTime.getTime() + 3 * 60 * 1000
     );
 
     for (const [choice, contract] of resolvableData) {
@@ -270,8 +270,8 @@ async function makeOracleRequests(
                 contractId: contract.contractId,
                 choiceId: choice.for_choice,
                 choiceBounds: choice.can_choose_between,
-                invalidBefore: timeBefore5Minutes,
-                invalidHereafter: timeAfter5Minutes,
+                invalidBefore: timeBefore3Minutes,
+                invalidHereafter: timeAfter3Minutes,
                 bridgeUtxo: some([utxo, oracle.bridgeValidatorUtxo]),
             };
             oracleResolvable.push(newRequest);

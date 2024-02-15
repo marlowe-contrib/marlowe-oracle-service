@@ -12,10 +12,10 @@
       "choiceName": "Charli3 ADAUSD",
       "roleName": "Charli3 Oracle",
       "bridgeValidatorUtxo": {
-        "txHash": "2e5338bbe38f0d826f7626c8a399319da93ae9db10635010457d2e15ca107ed5",
+        "txHash": "8758faa7146f194123525aef0c19356eb4eb77919acab24f7a02b39c40bf86e0",
         "outputIndex": 0
       },
-      "bridgeAddress": "addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu",
+      "bridgeAddress": "addr_test1wrgrr6rrp3n2kauhw236ae2ekznyvf7czs2vqdvzn7ppdhs94vzyf",
       "feedAddress": "addr_test1wzn5ee2qaqvly3hx7e0nk3vhm240n5muq3plhjcnvx9ppjgf62u6a",
       "feedPolicyId": "1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf07",
       "feedTokenName": "4f7261636c6546656564"
@@ -24,10 +24,10 @@
       "choiceName": "Orcfax ADAUSD",
       "roleName": "Orcfax Oracle",
       "bridgeValidatorUtxo": {
-        "txHash": "2e5338bbe38f0d826f7626c8a399319da93ae9db10635010457d2e15ca107ed5",
-        "outputIndex": 0
+        "txHash": "8758faa7146f194123525aef0c19356eb4eb77919acab24f7a02b39c40bf86e0",
+        "outputIndex": 1
       },
-      "bridgeAddress": "addr_test1wzg9jffqkv5luz8sayu5dmx5qhjfkayq090z0jmp3uqzmzq480snu",
+      "bridgeAddress": "addr_test1wpmnufh4ljl42f6rz47g70t6td8760kkxlx98nt22g0pyegj2cq7m",
       "feedAddress": "addr_test1wrtcecfy7np3sduzn99ffuv8qx2sa8v977l0xql8ca7lgkgmktuc0",
       "feedPolicyId": "104d51dd927761bf5d50d32e1ede4b2cff477d475fe32f4f780a4b21"
     }

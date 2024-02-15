@@ -207,6 +207,7 @@ pub fn check_choice(tn: AssetName, cd: ChoiceDict, redeemer: Redeemer) -> Bool {
              }
            },
          )
-
-  list.length(our_choices) > 0 && list.all(our_choices, fn(a) { a })
+  let any_choice = list.length(our_choices) > 0
+  let all_valid = list.all(our_choices, fn(a) { a })
+  any_choice? && all_valid?
 }
