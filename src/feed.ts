@@ -377,24 +377,19 @@ export function parseCharli3Price(datum: Datum): {
     price: bigint;
     validityInterval: ValidityInterval;
 } {
-    const date = new Date();
     let data = Data.from<Data>(datum);
     if (data instanceof Constr && data.index === 0) {
         let data2 = data.fields[0];
         if (data2 instanceof Constr && data2.index === 2) {
             let data3 = data2.fields[0];
             if (data3 instanceof Map) {
-                if ((data3.get(BigInt(2)) as bigint) > date.getTime()) {
-                    return {
-                        price: data3.get(BigInt(0)) as bigint,
-                        validityInterval: {
-                            validFrom: data3.get(BigInt(1)) as bigint,
-                            validThrough: data3.get(BigInt(2)) as bigint,
-                        },
-                    };
-                } else {
-                    throw new FeedError('Charli3PriceExpired');
-                }
+                return {
+                    price: data3.get(BigInt(0)) as bigint,
+                    validityInterval: {
+                        validFrom: data3.get(BigInt(1)) as bigint,
+                        validThrough: data3.get(BigInt(2)) as bigint,
+                    },
+                };
             } else {
                 throw new FeedError('UnexpectedCharli3DatumShape');
             }
@@ -434,16 +429,11 @@ export async function getOrcfaxPrice(
 
     let newestUTxOWithTime: [Option<[UTxO, Datum]>, bigint] = [none, 0n];
 
-    const currentTime = new Date();
-
     for (const utxo of feedUtxos) {
         try {
             if (utxo.datum) {
                 const vTimes = parseOrcfaxValidTime(utxo.datum);
-                if (
-                    currentTime.getTime() < vTimes.validThrough &&
-                    vTimes.validFrom > newestUTxOWithTime[1]
-                ) {
+                if (vTimes.validFrom > newestUTxOWithTime[1]) {
                     newestUTxOWithTime = [
                         some([utxo, utxo.datum]),
                         vTimes.validFrom,
