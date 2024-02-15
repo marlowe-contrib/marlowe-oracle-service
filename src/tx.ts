@@ -291,7 +291,7 @@ export async function buildAndSubmit(
             let allTxs: Tx[] = [];
             for (const [req, utxo] of contractUtxos) {
                 if (
-                    isSome(req.oracleUtxo) &&
+                    isNone(req.oracleUtxo) ||
                     checkValidityInterval(req.oracleUtxo.value[1], req)
                 ) {
                     const tx = await getApplyRequests(
