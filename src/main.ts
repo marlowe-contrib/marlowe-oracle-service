@@ -43,15 +43,7 @@ export async function main() {
                 lucid
             );
 
-            await buildAndSubmit(
-                client,
-                lucid,
-                applicableInputs,
-                mosEnv,
-                fromNullable(
-                    mosConfig.resolveMethod.charli3?.bridgeValidatorUtxo
-                )
-            );
+            await buildAndSubmit(client, lucid, applicableInputs, mosEnv);
 
             await new Promise((r) => setTimeout(r, mosConfig.delay));
         } while (true);

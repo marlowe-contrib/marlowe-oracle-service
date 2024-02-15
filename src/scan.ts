@@ -35,7 +35,7 @@ export type OracleRequest = {
     choiceBounds: Bound[];
     invalidBefore: Date;
     invalidHereafter: Date;
-    bridgeUtxo: Option<UTxO>;
+    bridgeUtxo: Option<[UTxO, UTxO]>;
 };
 
 /**
@@ -265,14 +265,14 @@ async function makeOracleRequests(
 
         const utxo = bridgeUtxos.find((utxo) => utxo.assets[assetClass] === 1n);
 
-        if (utxo) {
+        if (utxo && oracle.bridgeValidatorUtxo) {
             const newRequest: OracleRequest = {
                 contractId: contract.contractId,
                 choiceId: choice.for_choice,
                 choiceBounds: choice.can_choose_between,
                 invalidBefore: timeBefore5Minutes,
                 invalidHereafter: timeAfter5Minutes,
-                bridgeUtxo: some(utxo),
+                bridgeUtxo: some([utxo, oracle.bridgeValidatorUtxo]),
             };
             oracleResolvable.push(newRequest);
         } else {

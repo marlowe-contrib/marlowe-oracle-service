@@ -277,8 +277,7 @@ export async function buildAndSubmit(
     client: RestClient,
     lucid: Lucid,
     applicableInputs: ApplyInputsToContractRequest[],
-    mosEnv: MOSEnv<UTxO>,
-    bridgeValidatorUtxo: Option<UTxO>
+    mosEnv: MOSEnv<UTxO>
 ): Promise<void> {
     const submitted: string[] = [];
     if (applicableInputs.length > 0) {
@@ -292,7 +291,7 @@ export async function buildAndSubmit(
             let allTxs: Tx[] = [];
             for (const [req, utxo] of contractUtxos) {
                 if (
-                    isSome(req.oracleUtxo) &&
+                    isNone(req.oracleUtxo) ||
                     checkValidityInterval(req.oracleUtxo.value[1], req)
                 ) {
                     const tx = await getApplyRequests(
@@ -307,27 +306,25 @@ export async function buildAndSubmit(
                         }
 
                         if (isSome(req.bridgeUtxo)) {
-                            if (isNone(bridgeValidatorUtxo))
-                                throw new BuildTransactionError(
-                                    'NoBridgeValidatorUTxOConfigured'
-                                );
+                            const [bridgeUtxo, bridgeValidatorUtxo] =
+                                req.bridgeUtxo.value;
 
-                            tx.readFrom([bridgeValidatorUtxo.value]);
+                            tx.readFrom([bridgeValidatorUtxo]);
 
                             tx.collectFrom(
-                                [req.bridgeUtxo.value],
+                                [bridgeUtxo],
                                 Data.to(new Constr(1, []))
                             );
 
-                            if (!req.bridgeUtxo.value.datumHash)
+                            if (!bridgeUtxo.datumHash)
                                 throw new BuildTransactionError(
                                     'BridgeUTxOIsMissingDatumHash'
                                 );
 
                             tx.payToContract(
-                                req.bridgeUtxo.value.address,
-                                { hash: req.bridgeUtxo.value.datumHash },
-                                req.bridgeUtxo.value.assets
+                                bridgeUtxo.address,
+                                { hash: bridgeUtxo.datumHash },
+                                bridgeUtxo.assets
                             );
                         }
 

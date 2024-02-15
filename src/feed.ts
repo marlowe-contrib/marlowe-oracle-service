@@ -57,7 +57,7 @@ export type ApplyInputsToContractRequest = {
     inputs: Input[];
     invalidBefore: Date;
     invalidHereafter: Date;
-    bridgeUtxo: Option<UTxO>;
+    bridgeUtxo: Option<[UTxO, UTxO]>;
     oracleUtxo: Option<[UTxO, ValidityInterval]>;
 };
 
