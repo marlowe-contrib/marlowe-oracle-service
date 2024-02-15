@@ -306,29 +306,27 @@ export async function buildAndSubmit(
                         }
 
                     if (isSome(req.bridgeUtxo)) {
-                        if (isNone(req.bridgeValidatorUtxo))
-                            throw new BuildTransactionError(
-                                'NoBridgeValidatorUTxOConfigured'
-                            );
+                        const [bridgeUtxo, bridgeValidatorUtxo] =
+                            req.bridgeUtxo.value;
 
-                        tx.readFrom([req.bridgeValidatorUtxo.value]);
+                        tx.readFrom([bridgeValidatorUtxo]);
 
-                            tx.collectFrom(
-                                [req.bridgeUtxo.value],
-                                Data.to(new Constr(1, []))
-                            );
+                        tx.collectFrom(
+                            [bridgeUtxo],
+                            Data.to(new Constr(1, []))
+                        );
 
-                        if (!req.bridgeUtxo.value.datumHash)
+                        if (!bridgeUtxo.datumHash)
                             throw new BuildTransactionError(
                                 'BridgeUTxOIsMissingDatumHash'
                             );
 
-                            tx.payToContract(
-                                req.bridgeUtxo.value.address,
-                                { hash: req.bridgeUtxo.value.datumHash },
-                                req.bridgeUtxo.value.assets
-                            );
-                        }
+                        tx.payToContract(
+                            bridgeUtxo.address,
+                            { hash: bridgeUtxo.datumHash },
+                            bridgeUtxo.assets
+                        );
+                    }
 
                         allTxs.push(tx);
                     }

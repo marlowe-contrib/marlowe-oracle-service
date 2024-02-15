@@ -43,12 +43,7 @@ export async function main() {
                 lucid
             );
 
-            await buildAndSubmit(
-                client,
-                lucid,
-                applicableInputs,
-                mosEnv,
-            );
+            await buildAndSubmit(client, lucid, applicableInputs, mosEnv);
 
             await new Promise((r) => setTimeout(r, mosConfig.delay));
         } while (true);

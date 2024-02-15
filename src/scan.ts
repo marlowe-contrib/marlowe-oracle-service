@@ -35,8 +35,7 @@ export type OracleRequest = {
     choiceBounds: Bound[];
     invalidBefore: Date;
     invalidHereafter: Date;
-    bridgeUtxo: Option<UTxO>;
-    bridgeValidatorUtxo: Option<UTxO>;
+    bridgeUtxo: Option<[UTxO, UTxO]>;
 };
 
 /**
@@ -151,7 +150,6 @@ export async function getActiveContracts(
                             invalidBefore: timeBefore5Minutes,
                             invalidHereafter: timeAfter5Minutes,
                             bridgeUtxo: none,
-                            bridgeValidatorUtxo: none,
                         };
 
                         addressResolvable.push(newRequest);
@@ -274,8 +272,7 @@ async function makeOracleRequests(
                 choiceBounds: choice.can_choose_between,
                 invalidBefore: timeBefore5Minutes,
                 invalidHereafter: timeAfter5Minutes,
-                bridgeUtxo: some(utxo),
-                bridgeValidatorUtxo: some(oracle.bridgeValidatorUtxo),
+                bridgeUtxo: some([utxo, oracle.bridgeValidatorUtxo]),
             };
             oracleResolvable.push(newRequest);
         } else {
