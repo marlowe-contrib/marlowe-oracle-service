@@ -39,7 +39,12 @@ import {
     throwAxiosError,
 } from './error.ts';
 import { txLogger } from './logger.ts';
-import { ApplyInputsToContractRequest } from './feed.ts';
+import {
+    ApplyInputsToContractRequest,
+    ValidityInterval,
+    parseCharli3Price,
+    parseOrcfaxValidTime,
+} from './feed.ts';
 
 /**
  * Represents the request structure for the Marlowe Apply Service (MAS).
@@ -286,46 +291,54 @@ export async function buildAndSubmit(
 
             let allTxs: Tx[] = [];
             for (const [req, utxo] of contractUtxos) {
-                const tx = await getApplyRequests(
-                    lucid,
-                    mosEnv.applyUrl,
-                    utxo,
-                    req
-                );
-                if (tx) {
-                    if (isSome(req.oracleUtxo)) {
-                        tx.readFrom([req.oracleUtxo.value]);
-                    }
+                if (
+                    isSome(req.oracleUtxo) &&
+                    checkValidityInterval(req.oracleUtxo.value[1], req)
+                ) {
+                    const tx = await getApplyRequests(
+                        lucid,
+                        mosEnv.applyUrl,
+                        utxo,
+                        req
+                    );
+                    if (tx) {
+                        if (isSome(req.oracleUtxo)) {
+                            tx.readFrom([req.oracleUtxo.value[0]]);
+                        }
 
-                    if (isSome(req.bridgeUtxo)) {
-                        if (isNone(bridgeValidatorUtxo))
-                            throw new BuildTransactionError(
-                                'NoBridgeValidatorUTxOConfigured'
+                        if (isSome(req.bridgeUtxo)) {
+                            if (isNone(bridgeValidatorUtxo))
+                                throw new BuildTransactionError(
+                                    'NoBridgeValidatorUTxOConfigured'
+                                );
+
+                            tx.readFrom([bridgeValidatorUtxo.value]);
+
+                            tx.collectFrom(
+                                [req.bridgeUtxo.value],
+                                Data.to(new Constr(1, []))
                             );
 
-                        tx.readFrom([bridgeValidatorUtxo.value]);
+                            if (!req.bridgeUtxo.value.datumHash)
+                                throw new BuildTransactionError(
+                                    'BridgeUTxOIsMissingDatumHash'
+                                );
 
-                        tx.collectFrom(
-                            [req.bridgeUtxo.value],
-                            Data.to(new Constr(1, []))
-                        );
-
-                        if (!req.bridgeUtxo.value.datumHash)
-                            throw new BuildTransactionError(
-                                'BridgeUTxOIsMissingDatumHash'
+                            tx.payToContract(
+                                req.bridgeUtxo.value.address,
+                                { hash: req.bridgeUtxo.value.datumHash },
+                                req.bridgeUtxo.value.assets
                             );
+                        }
 
-                        tx.payToContract(
-                            req.bridgeUtxo.value.address,
-                            { hash: req.bridgeUtxo.value.datumHash },
-                            req.bridgeUtxo.value.assets
-                        );
+                        allTxs.push(tx);
                     }
-
-                    allTxs.push(tx);
+                } else {
+                    txLogger.warn(
+                        'Oracle Feed Time is outside Tx validty bounds'
+                    );
                 }
             }
-
             allTxs = allTxs.map((tx) => {
                 return tx.readFrom([mosEnv.marloweValidatorUtxo]);
             });
@@ -511,4 +524,21 @@ function isIncluded(ref: OutRef, inputs: C.TransactionInputs): Boolean {
         }
     }
     return false;
+}
+
+/**
+ * Utility to check if the given interval for the transaction falls within the
+ * validity bounds of the Oracle Feed
+ * @param interval validity interval of the oracle feed
+ * @param req apply inputs request that has the validity interval that will be set for the tx
+ * @returns whether the transaction's interval is within the Oracle Feed's or not
+ */
+function checkValidityInterval(
+    interval: ValidityInterval,
+    req: ApplyInputsToContractRequest
+): Boolean {
+    const validityBefore = req.invalidBefore.getTime() > interval.validFrom;
+    const validityAfter =
+        req.invalidHereafter.getTime() < interval.validThrough;
+    return validityBefore && validityAfter;
 }
