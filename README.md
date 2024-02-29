@@ -17,8 +17,7 @@ export MARLOWE_VALIDATOR_UTXO_REF='COMPLETE ME'
 export APPLY_URL='COMPLETE ME'
 ```
 
-We can find a working Marlowe Runtime instance at https://marlowe-runtime-preprod-web.scdev.aws.iohkdev.io[^3]. The Marlowe script address is `addr_test1wrv9l2du900ajl27hk79u07xda68vgfugrppkua5zftlp8g0l9djk` for Preprod and the UTxO ref of the validator is `c59678b6892ba0fbeeaaec22d4cbde17026ff614ed47cea02c47752e5853ebc8#1`[^4]. The address can be found on a network explorer like Cexplorer[^5] or obtained using the validator and a utility like Lucid's validatorToAddress function[^6].
-You can also find a running instance of the Apply Service here: https://3000-magnetic-gladness-fw5d6k.us1.demeter.run/apply.
+For preprod, we provide a file [.preprod.env](.preprod.env) with some of these environment variables already set up. The missing variables are the signing key, which is specific for your address, and the MAS url. For information on how to run the MAS, you can check out the [github](https://github.com/marlowe-contrib/marlowe-apply-service).
 
 Besides, we need to include the token or key corresponding to the provider we want to use. Currently, MOS supports Maestro and Blockfrost. We must include one (and only one) of the following environment variables:
 
@@ -29,7 +28,7 @@ export BLOCKFROST_APIKEY='COMPLETE ME'
 
 You can get your own token from the providers' websites[^1][^2].
 
-After configuring all the enviroment variables in the .env file, we must run `source .env` to export them.
+After configuring all the enviroment variables in the .env file, we must run `source .preprod.env` to export them. Each time any of these variables are changed, we must run `source .preprod.env` again.
 
 The other part of the configuration it's done in the [mos-config.json](./mos-config.json) file that must be given as argument:
 
@@ -73,8 +72,9 @@ The other part of the configuration it's done in the [mos-config.json](./mos-con
 
 We specify the waiting time of each iteration in milliseconds, the marlowe tags to scan and the choice resolution method we want to have.
 
-There are three different choice resolution methods supported: address, charli3 and orcfax. All of them are optional, so we can configure only the ones we want to support. For the address method, we need to specify the address we will be using and the list of choice names we are resolving. For the charli3 and orcfax methods, there's more configuration involved:
+There are three different choice resolution methods supported: address, charli3 and orcfax. All of them are optional, so we can configure only the ones we want to support. For the address method, we need to specify the address we will be using and the list of choice names we are resolving. The address is the owner of the Choice that asks for an oracle value.
 
+For the charli3 and orcfax methods, there's more configuration involved:
 -   choiceName: The choice name to resolve
 -   roleName: Name of the role token to use
 -   bridgeValidatorUtxo: TxHash and index of the utxo containing the script of the bridge validator
@@ -146,49 +146,7 @@ $ aiken check
 
 ## Using the deploy bridge utility.
 
-We provide a utility to easily deploy new reference scripts for the bridge validators. To use it follow these instructions:
-
-### Reading the compiled code and applying the parameters.
-
-When we run aiken build a file called [plutus.json](./on-chain-bridge/plutus.json) gets modified (or created if it didn’t exist previously). In this file we can find the compiled code for the validators, and information about its parameters among other things. This information can be useful when applying the parameters because we will need to make sure that the types match.
-
-In the [deploy-bridge.ts](./tests/deploy-bridge.ts) file, let’s begin by defining a new variable called orcfaxCompiled which holds the compiled code obtained from the `plutus.json` file. This is easy since there's a function already that parses that file and returns the array of validators. We just have to check the index of the oracle. In this case it’s at 1.
-[const orcfaxCompiled = validators[1].compiledCode;](https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L25C1-L25C51)
-
-Now, let’s define the parameters. For this it will be useful to have the `plutus.json` file on hand, to check how each parameter has to be built.
-First we have the Marlowe contract address which is already defined. Next, we have Orcfax’s address. Using the address found on the documentation for Orcfax, we extract the payment credential hash, and pass that to build the Address type that Aiken uses, using the utility function `mkAddress`.
-https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L33-L35
-[const orcfaxAddress = mkAddress(orcfaxPayment);](https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L47)
-
-The next parameters are the policyId and the Orcfax feed name, which are simply ByteArrays so we just pass them as strings:
-https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L49-L50
-We use fromText to hex encode the text.
-
-The last parameter is the choice names, in this case it’s a tuple, so we’ll use another utility function:
-https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L41-L43
-[const orcfaxChoices = mkOrcfaxTuple('Orcfax ADAUSD', 'OrcfaxUSDADA');](https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L51)
-
-Now that we finished defining the parameters, we can finally apply them to the compiled code. We’ll use a Lucid utility for this:
-https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L69-L78
-Here, we define a new variable for the script, it includes its type and the script itself as a string. We use the `applyParamsToScript` function that takes the compiled code, and the parameters in a list. We have to make sure that the parameters are ordered exactly like they appear in the on-chain code.
-
-Once the parameters were correctly applied we can obtain the validator’s address.
-[const orcfaxBridgeAddress = lucid.utils.validatorToAddress(orcfaxBridge);](https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L85C1-L85C74)
-This address will be used in the `mos-config.json` as the `bridgeAddress` for the respective oracle, since this address will be the recipient of the role tokens.
-
-### Deploying the validator as a reference script.
-
-The last step is to actually deploy the validator to the blockchain as a reference script. For this, let’s just simply modify the transaction to add another payment that will hold our new validator:
-https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L116-L130
-The rest of the code will remain the same.
-
-To run this script we can do
-
-```bash
-npm run deploy-bridge
-```
-
-Once it finishes running we will see printed on the screen the transaction hash of this last transaction. This hash will also be used in the `mos-config.json`, as the `bridgeValidatorUtxo`. If there are more than one validators being deployed be mindful of the respective indexes.
+We provide a utility to easily deploy new reference scripts for the bridge validators. To use it follow these [instructions](./docs/how-to-use-deploy-bridge.md).
 
 ## Stats
 
