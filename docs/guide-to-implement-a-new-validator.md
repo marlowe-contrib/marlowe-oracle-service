@@ -4,7 +4,7 @@ The Marlowe Oracle Service includes the on-chain code for the decentralized orac
 
 Some knowledge about the Cardano blockchain and the EUTxO model will be necessary, and knowledge about Aiken and Typescript will also be helpful.
 
-Before going into the implementation of a new validator, we must understand what the [validator](https://github.com/marlowe-contrib/marlowe-oracle-service/blob/main/docs/design.md#33-oracle-bridge-validator) does. So, let’s quickly revise the checks that the validator performs.
+Before going into the implementation of a new validator, we must understand what the validator should do. For more information on why these validations ensure a correct usage of the feeds, you can check out the [design document](https://github.com/marlowe-contrib/marlowe-oracle-service/blob/main/docs/design.md#33-oracle-bridge-validator). So, let’s quickly revise the checks that the validator performs.
 If the redeemer is True we want to check that the transaction is correctly built and the feed is used accurately too, so we run the following validations:
 
 -   The datum of the continuing output doesn’t change
@@ -29,7 +29,7 @@ On the other hand, if the redeemer is False it means that we want to destroy the
 As we previously mentioned, most of the verifications that the validator does are performed by functions that were specifically designed to be agnostic of any oracle, as much as possible.
 So, the main validator function for our new validator (the one with the validator keyword) will remain mostly the same as the one for Charli3. In the validators/bridge.ak file, let’s add what could be seen as the boilerplate for the new validator:
 
-```aiken
+```rust
 validator(
   marlowe_address: Address,
   . . . , // complete here
@@ -67,16 +67,17 @@ validator(
 }
 ```
 
-This code is almost the same as the validator for Charli3 except for a few missing lines and definitions, highlighted by the complete here text.
+This code works perfectly as scaffolding. In fact, it is pretty similar to the validator for Charli3 except for a few missing lines and definitions, highlighted by the `complete here` text.
 
 ## Code specific to the oracle
 
 Now, let’s complete the code from the previous section. We can see that there are a couple of parts missing: some parameters, and the definition of the `feed` and `choice_value_dict` variables.
 
-### Defining the parameters
+### Understanding the oracle
 
-The parameters missing are the ones related to the Oracle and the information we need for the lookup of the oracle feed UTxO within the reference inputs. These parameters may vary but it will generally be an address, and the asset class (or the Policy Id) of an NFT identifying the oracle feed. To complete them, we must study the oracle in question.
-Continuing with our example, we can see on Orcfax’s documentation[^1] that we will need to use an address and a PolicyId, in contrast with Charli3 which provides a whole Asset Class.
+To complete the missing definitions we must first take a look at the oracle's documentation. We'll look for information regarding how the Oracle UTxO is identified, the shape of the datum, among other details that will probably vary between different oracles.
+
+For example, we can see on Orcfax’s documentation[^1] that we will need to use an address and a PolicyId to identify the correct UTxO, in contrast with Charli3 which provides a whole Asset Class.
 
 ```json
 {
@@ -95,6 +96,11 @@ In this case the datum also specifies the name of the exchange rate it informs, 
 
 Other interesting details we might note in the documentation are the fact that it has an inline datum (which will be useful when decoding the datum), and that it informs two feeds, instead of just one. What does this mean for our implementation? That we will have two possible choice names for a single oracle, and that our lookup function will possibly need to return two feeds.
 
+### Defining the parameters
+
+The parameters missing are the ones related to the Oracle and the information we need for the lookup of the oracle feed UTxO within the reference inputs. These parameters may vary but it will generally be an address, and the asset class (or the Policy Id) of an NFT identifying the oracle feed.
+
+As we saw in the previous section, Orcfax provides an address and a Policy Id, and we will have two choice names.
 Then, our validator’s parameters will look like this:
 https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/on-chain-bridge/validators/bridge.ak#L56-L62
 
@@ -104,10 +110,10 @@ Having defined the parameters, we can move on to implementing the `lookup_orcfax
 
 For example with Orcfax, the lookup function will:
 
--   find the Orcfax reference input, using the Address from the parameters and make sure that it is exactly one
--   check that the transaction’s validity interval falls within the validity interval of the orcfax feed
--   check that the name for the exchange rate in the datum is the same as the one provided as a parameter.
-    Or fail if some of these conditions aren’t met.
+-   Find the Orcfax reference input, using the Address, and the Policy Id from the parameters and make sure that it is exactly one
+-   Check that the transaction’s validity interval falls within the validity interval of the Orcfax feed
+-   Check that the name for the exchange rate in the datum is the same as the one provided as a parameter
+Or fail if some of these conditions aren’t met.
 
 In a new file named [orcfax.ak](../on-chain-bridge/lib/oracles/orcfax.ak) in the `lib/oracles` folder, let’s define the function:
 https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/on-chain-bridge/lib/oracles/orcfax.ak#L204-L235
