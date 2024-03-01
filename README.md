@@ -156,7 +156,3 @@ We provide a utility to easily deploy new reference scripts for the bridge valid
 
 [^1]: <https://blockfrost.io/>
 [^2]: <https://www.gomaestro.org/>
-[^3]: <https://docs.marlowe.iohk.io/api/get-contracts>
-[^4]: <https://preprod.cexplorer.io/tx/c59678b6892ba0fbeeaaec22d4cbde17026ff614ed47cea02c47752e5853ebc8>
-[^5]: <https://preprod.cexplorer.io>
-[^6]: <https://deno.land/x/lucid@0.10.7/mod.ts?s=Utils&p=prototype.validatorToAddress>

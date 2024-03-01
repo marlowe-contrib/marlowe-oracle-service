@@ -1,6 +1,6 @@
 ## How to use the deploy bridge utility.
 
-[deploy-bridge.ts](../tests/deploy-bridge.ts) is a script that lets you easily deploy a validator as reference scripts. The instructions how to set up and use the script are below: 
+[deploy-bridge.ts](../tests/deploy-bridge.ts) is a script that lets you easily deploy a validator as reference scripts. The instructions how to set up and use the script are below:
 
 ### Reading the compiled code and applying the parameters.
 
