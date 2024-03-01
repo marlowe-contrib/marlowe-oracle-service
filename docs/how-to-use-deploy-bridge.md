@@ -10,8 +10,6 @@ In the [deploy-bridge.ts](../tests/deploy-bridge.ts) file, let’s begin by defi
 
 Now, let’s define the parameters. For this it will be useful to have the `plutus.json` file on hand, to check how each parameter has to be built.
 First we have the Marlowe contract address which is already defined. Next, we have Orcfax’s address. Using the address found on the documentation for Orcfax, we extract the payment credential hash, and pass that to build the Address type that Aiken uses, using the utility function `mkAddress`, as a new variable [orcfaxAddress](https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L47).
-https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L33-L35
-
 
 The next parameters are the policyId and the Orcfax feed name, which are simply ByteArrays so we just pass them as strings:
 https://github.com/marlowe-contrib/marlowe-oracle-service/blob/9970c85e43b4e771a232a16db11a69d4e1975377/tests/deploy-bridge.ts#L49-L50
