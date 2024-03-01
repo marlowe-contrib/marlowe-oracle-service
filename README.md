@@ -6,7 +6,7 @@ A complete design document can be found [here](./docs/design.md).
 
 ## Run the service
 
-The MOS service requires specific environment variables and a configuration file to be set up prior to starting. The env-vars will contain secret/critical information that also doesn't change too often:
+The MOS service requires specific environment variables and a configuration file to be set up prior to starting. [Here](https://www.youtube.com/watch?v=vHNLUrgpkik) you can find a useful video of the complete configuration and execution of the service. The env-vars will contain secret/critical information that also doesn't change too often:
 
 ```shell
 export MARLOWE_RUNTIME_URL='COMPLETE ME'
