@@ -140,6 +140,6 @@ If we didn’t make any mistakes we should be able to run
 
 successfully, and we are ready to deploy the validator.
 
-We provide a utility script to deploy validators, and you can find the instructions to use it in the [README.md](../README.md).
+We provide a utility script to deploy validators, and you can find the instructions to use it in the [how-to-use-deploy-bridge.md](./how-to-use-deploy-bridge.md).
 
 [^1]: <https://docs.orcfax.io/consume>
