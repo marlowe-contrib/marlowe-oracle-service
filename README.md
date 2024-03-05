@@ -4,7 +4,7 @@
 
 A complete design document can be found [here](./docs/design.md).
 
-## Run the service
+## Run the service locally
 
 The MOS service requires specific environment variables and a configuration file to be set up prior to starting. [Here](https://www.youtube.com/watch?v=vHNLUrgpkik) you can find a useful video of the complete configuration and execution of the service. The env-vars will contain secret/critical information that also doesn't change too often:
 
@@ -88,6 +88,15 @@ Use the following commands to install all the dependencies and then run the serv
 ```bash
     npm install
     npm run dev -- mos-config.json
+```
+
+## Run the service with Docker
+
+The MOS can be run with Docker too. To do it, we need to set up the environment variables in the [.docker.env](.docker.env) file. The values should be the same as the other .env file, but in this case it must not have the `export` keyword, or any quotes surrounding the values.
+After setting those values, we can build and run the container:
+```bash
+$ docker build -t mos .
+$ docker run --env-file .docker.env mos
 ```
 
 ## Deploy a contract
