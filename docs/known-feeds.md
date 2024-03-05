@@ -46,17 +46,17 @@ The following table contains the information about all the feeds that the curren
 
 #### How to read the table?
 
-To safely use table information in a **Choice Action** within a Marlowe Contract, it's important to understand how to read the table information. When setting up a Marlowe Contract that requires oracle feed information, a **Choice** needs to be used. To make a **Choice**, three pieces of information are needed: the **Choice Owner**, the **Choice Name**, and a **Choose Between** range of allowed values to resolve the choice.
+To safely use the table information in a **Choice Action** within a Marlowe Contract, it's important to understand how to read it. When setting up a Marlowe Contract that requires oracle feed information, a **Choice** needs to be used. To make a **Choice**, three pieces of information are needed: the **Choice Owner**, the **Choice Name**, and a **Choose Between** range of allowed values to resolve the choice.
 
 - The **Choice Owner** will be composed by the `Source` name followed by the word "Oracle".
 - The **Choice Name** will be composed by the `Source` name followed by the `Feed` name.
-- The **Choose Between** range consists of two integers that specify the valid range for the resolved integer value. It's **extremly important** to understand that because the choice only supports integers we need to have some kind "conversion" from a (most probably) decimal number to some integer. Here is when the `Extra` information comes to play, specifying the amount by which we need to divide the integer that is resolving the choice.
+- The **Choose Between** range consists of two integers that specify the valid range for the resolved integer value. It's **extremly important** to understand that because the choice only supports integers we need to have some kind "conversion" from a (most probably) decimal number to some integer. Here is when the `Extra` information comes to play, specifying the amount by which we need to divide the integer that is resolving the choice, to obtain the real value.
 
 Lastly, another really relevant information in the table is the `OnChain Validation`, meaning the transaction resolving the choice will go along with the bridge validation ensuring the correctness of the provided feed.
 
 ##### Example
 
-Let's suppose we want to use the Orcfax ADAUSD feed, then:
+Let's suppose we want to use the `Orcfax ADAUSD` feed, then:
 
 - **Choice Owner**: `Orcfax Oracle`
 - **Choice Name**: `Orcfax ADAUSD`
