@@ -1,0 +1,21 @@
+version: "1.0"
+
+services:
+  marlowe-apply:
+    image: alegadeatxpipe/marlowe-apply:v0.0.4
+    container_name: mas
+    ports:
+      - target: 3000
+        host_ip: 127.0.0.1
+        published: 3000
+    networks:
+      - default
+    stdin_open: true
+    tty: true
+  marlowe-oracle:
+    build: .
+    container_name: mos
+    env_file:
+      - .docker.env
+    networks:
+      - default

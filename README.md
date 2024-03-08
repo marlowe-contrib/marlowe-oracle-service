@@ -6,6 +6,14 @@ A complete design document can be found [here](./docs/design.md).
 
 ## Run the service
 
+We provide 3 ways to run the Marlowe Oracle Service:
+
+1. [Run the MOS locally](#run-the-mos-locally), with an existing instance of the Marlowe Apply Service
+2. [Run the MOS with Docker](#run-only-the-mos-with-docker), with an existing instance of the Marlowe Apply Service
+3. [Run the MOS and the Marlowe Apply Service](#run-the-mos-along-with-the-marlowe-apply-service) together with Docker compose
+
+### Run the MOS locally
+
 The MOS service requires specific environment variables and a configuration file to be set up prior to starting. [Here](https://www.youtube.com/watch?v=vHNLUrgpkik) you can find a useful video of the complete configuration and execution of the service. The env-vars will contain secret/critical information that also doesn't change too often:
 
 ```shell
@@ -75,6 +83,7 @@ We specify the waiting time of each iteration in milliseconds, the marlowe tags 
 There are three different choice resolution methods supported: address, charli3 and orcfax. All of them are optional, so we can configure only the ones we want to support. For the address method, we need to specify the address we will be using and the list of choice names we are resolving. The address is the owner of the Choice that asks for an oracle value.
 
 For the charli3 and orcfax methods, there's more configuration involved:
+
 -   choiceName: The choice name to resolve
 -   roleName: Name of the role token to use
 -   bridgeValidatorUtxo: TxHash and index of the utxo containing the script of the bridge validator
@@ -89,6 +98,27 @@ Use the following commands to install all the dependencies and then run the serv
     npm install
     npm run dev -- mos-config.json
 ```
+
+## Run only the MOS with Docker
+
+The MOS can be run with Docker too. To do it, we need to set up the environment variables in the [.docker.env](.docker.env) file. The values should be the same as the other .env file, but in this case it must not have the `export` keyword, or any quotes surrounding the values.
+After setting those values, we can build and run the container:
+
+```bash
+$ docker build -t mos .
+$ docker run --env-file .docker.env mos
+```
+
+### Run the MOS along with the Marlowe Apply Service.
+
+To run the Marlowe Oracle Service along with an instance of the Marlowe Apply Service, we provide a [docker-compose](docker-compose.yaml) file. This will pull the Marlowe Apply Service image from Dockerhub[^3] and build the MOS from the local `dockerfile`. We'll need the same .`docker.env` file as in the previous section but the variable `APPLY_URL` will have the value: `http://mas:3000/apply`.
+Then, we can build and run both services with:
+
+```bash
+$ docker compose up
+```
+
+This command might take a while the first time you execute it.
 
 ## Deploy a contract
 
@@ -156,3 +186,4 @@ We provide a utility to easily deploy new reference scripts for the bridge valid
 
 [^1]: <https://blockfrost.io/>
 [^2]: <https://www.gomaestro.org/>
+[^3]: <https://hub.docker.com/>
