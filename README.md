@@ -111,7 +111,7 @@ $ docker run --env-file .docker.env mos
 
 ### Run the MOS along with the Marlowe Apply Service.
 
-To run the Marlowe Oracle Service along with an instance of the Marlowe Apply Service, we provide a [docker-compose](docker-compose.yaml) file. First we need to have the Marlowe Apply Service [repository](https://github.com/marlowe-contrib/marlowe-apply-service) cloned at the root of this project. We'll also need the same .`docker.env` file as in the previous section but the variable `APPLY_URL` will have the value: `http://mas:3000/apply`.
+To run the Marlowe Oracle Service along with an instance of the Marlowe Apply Service, we provide a [docker-compose](docker-compose.yaml) file. This will pull the Marlowe Apply Service image from Dockerhub[^3] and build the MOS from the local `dockerfile`. We'll need the same .`docker.env` file as in the previous section but the variable `APPLY_URL` will have the value: `http://mas:3000/apply`.
 Then, we can build and run both services with:
 
 ```bash
@@ -186,3 +186,4 @@ We provide a utility to easily deploy new reference scripts for the bridge valid
 
 [^1]: <https://blockfrost.io/>
 [^2]: <https://www.gomaestro.org/>
+[^3]: <https://hub.docker.com/>

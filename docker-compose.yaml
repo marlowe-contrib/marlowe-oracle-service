@@ -2,7 +2,7 @@ version: "1.0"
 
 services:
   marlowe-apply:
-    build: ./marlowe-apply-service
+    image: alegadeatxpipe/marlowe-apply:v0.0.4
     container_name: mas
     ports:
       - target: 3000
