@@ -22,6 +22,7 @@ import {
     UTxO,
     fromText,
     fromUnit,
+    toText,
     toUnit,
 } from 'lucid-cardano';
 
@@ -70,6 +71,8 @@ const KnownCurrencyPairs = new Map([
     ['Charli3 ADAUSD', { source: 'Charli3', from: 'ADA', to: 'USD' }],
     ['Orcfax ADAUSD', { source: 'Orcfax', from: 'ADA', to: 'USD' }],
 ]);
+
+const OrcfaxFeedNames = new Map([['Orcfax ADAUSD', 'ADA-USD|USD-ADA']]);
 
 /**
  * @param request Necessary information about the feed to provide and the Contract
@@ -329,6 +332,7 @@ async function setPriceMap(
                         );
                     [price, utxo] = await getOrcfaxPrice(
                         resMethods.orcfax,
+                        cn,
                         lucid
                     );
                     break;
@@ -412,6 +416,7 @@ export function parseCharli3Price(datum: Datum): {
  */
 export async function getOrcfaxPrice(
     ofConfig: OracleConfig<UTxO>,
+    cn: string,
     lucid: Lucid
 ): Promise<[bigint, Option<[UTxO, ValidityInterval]>]> {
     const orcFaxUtxos = await lucid.utxosAt(ofConfig.feedAddress);
@@ -433,7 +438,12 @@ export async function getOrcfaxPrice(
         try {
             if (utxo.datum) {
                 const vTimes = parseOrcfaxValidTime(utxo.datum);
-                if (vTimes.validFrom > newestUTxOWithTime[1]) {
+                const name = toText(parseOrcfaxName(utxo.datum));
+
+                if (
+                    vTimes.validFrom > newestUTxOWithTime[1] &&
+                    name === OrcfaxFeedNames.get(cn)
+                ) {
                     newestUTxOWithTime = [
                         some([utxo, utxo.datum]),
                         vTimes.validFrom,
@@ -534,6 +544,20 @@ export function parseOrcfaxValidTime(raw_datum: Datum): ValidityInterval {
             } else {
                 throw new FeedError('UnexpectedOrcfaxDatumShape');
             }
+        } else {
+            throw new FeedError('UnexpectedOrcfaxDatumShape');
+        }
+    } else {
+        throw new FeedError('UnexpectedOrcfaxDatumShape');
+    }
+}
+
+export function parseOrcfaxName(raw_datum: Datum): string {
+    let data = Data.from<Data>(raw_datum);
+    if (data instanceof Constr && data.index === 0) {
+        let data2 = data.fields[0];
+        if (data2 instanceof Map) {
+            return data2.get(fromText('name')) as string;
         } else {
             throw new FeedError('UnexpectedOrcfaxDatumShape');
         }
