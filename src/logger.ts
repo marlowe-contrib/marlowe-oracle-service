@@ -32,7 +32,13 @@ export const mosLogger = new Logger({
         fileName: ['yellow'],
     },
     hideLogPositionForProduction: true,
-    maskValuesOfKeys: ['apiKey', 'signingKey', 'signTxUrl', 'script'],
+    maskValuesOfKeys: [
+        'apiKey',
+        'signingKey',
+        'signTxUrl',
+        'script',
+        'projectId',
+    ],
 });
 
 export const configLogger = mosLogger.getSubLogger({ name: 'Config' });
