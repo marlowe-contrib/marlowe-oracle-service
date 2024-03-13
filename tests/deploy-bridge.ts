@@ -48,7 +48,7 @@ const orcfaxAddress = mkAddress(orcfaxPayment);
 
 const orcfaxPolicy = '104d51dd927761bf5d50d32e1ede4b2cff477d475fe32f4f780a4b21';
 const orcfaxFeedName = fromText('ADA-USD|USD-ADA');
-const orcfaxChoices = mkOrcfaxTuple('Orcfax ADAUSD', 'OrcfaxUSDADA');
+const orcfaxChoices = mkOrcfaxTuple('Orcfax ADAUSD', 'Orcfax USDADA');
 
 const charli3Policy =
     '1116903479e7320b8e4592207aaebf627898267fcd80e2d9646cbf07';
