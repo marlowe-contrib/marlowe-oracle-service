@@ -34,6 +34,7 @@ const lucid = await Lucid.new(mosEnv.provider, mosEnv.network);
 lucid.selectWalletFromPrivateKey(mosEnv.signingKey);
 
 let args = '';
+let bridgeAddress = '';
 let tag = 'requires.marlowe.oracle.test.alpha.1';
 const program = new Command();
 program
@@ -43,6 +44,11 @@ program
         '<filepath>',
         'Complete choice for the contract',
         (fp) => (args = fp)
+    )
+    .argument(
+        '<bridge-address>',
+        'Address of the bridge validator to use',
+        (addr) => (bridgeAddress = addr)
     )
     .argument(
         '[marlowe-tag]',
@@ -201,7 +207,7 @@ try {
         const datum = Data.to<BridgeDatum>(bridgeDatum, BridgeDatum);
 
         newTx.payToAddressWithData(
-            'addr_test1wrgrr6rrp3n2kauhw236ae2ekznyvf7czs2vqdvzn7ppdhs94vzyf',
+            bridgeAddress,
             { inline: datum },
             { [oracleTokenAsset]: 1n }
         );
