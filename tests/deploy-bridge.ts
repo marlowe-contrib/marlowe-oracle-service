@@ -86,21 +86,21 @@ const orcfaxBridgeAddress = lucid.utils.validatorToAddress(orcfaxBridge);
 console.log('Orcfax Script Address: ', orcfaxBridgeAddress);
 console.log(orcfaxBridge.script);
 
-const ownAddress = lucid.utils.paymentCredentialOf(
+const ownPH = lucid.utils.paymentCredentialOf(
     await lucid.wallet.address()
 ).hash;
 
-const checkSignatureCompiled = '586f010000323232323232232222533300732323300100100222533300c00114a026464a66601866e3c00802452889980200200098078011bae300d0013758601460166016601660166016601660166016600c6014600c00229309b2b1bae001230033754002ae6955cf2ab9f5742ae881'
+const checkSignatureCompiled = '586f010000323232323232232222533300732323300100100222533300c00114a026464a66601866e3c00802452889980200200098078011bae300d0013758601460166016601660166016601660166016600c6014600c00229309b2b1bae001230033754002ae6955cf2ab9f5742ae881';
 
 const checkSignatureScript: Script = {
     type: 'PlutusV2',
-    script: applyParamsToScript(checkSignatureCompiled, [ownAddress])
+    script: applyParamsToScript(checkSignatureCompiled, [ownPH])
 }
 
 const checkSignatureAddress = lucid.utils.validatorToAddress(checkSignatureScript);
 
 const utxos = await lucid.utxosAt(checkSignatureAddress);
-const redeemer = Data.to(new Constr(0, []));
+const redeemer = Data.void()
 
 const tx = await lucid
     .newTx()
@@ -115,7 +115,9 @@ const tx = await lucid
         { inline: Data.void(), scriptRef: orcfaxBridge },
         {}
     )
-    // .attachSpendingValidator(checkSignatureScript)
+    .addSignerKey(ownPH)
+    // uncomment the following line after deploying for the first time
+    // .attachSpendingValidator(checkSignatureScript) 
     .complete();
 const txSigned = await tx.sign().complete();
 const txHash = await txSigned.submit();
