@@ -1,12 +1,10 @@
 import {
-    Assets,
     Constr,
     Data,
     Lucid,
     Script,
     applyParamsToScript,
-    fromText,
-    toUnit,
+    fromText
 } from 'lucid-cardano';
 import { parseMOSEnv } from '../src/config.ts';
 
@@ -90,21 +88,30 @@ const ownPH = lucid.utils.paymentCredentialOf(
     await lucid.wallet.address()
 ).hash;
 
-const checkSignatureCompiled = '586f010000323232323232232222533300732323300100100222533300c00114a026464a66601866e3c00802452889980200200098078011bae300d0013758601460166016601660166016601660166016600c6014600c00229309b2b1bae001230033754002ae6955cf2ab9f5742ae881';
+const checkSignatureCompiled =
+    '586f010000323232323232232222533300732323300100100222533300c00114a026464a66601866e3c00802452889980200200098078011bae300d0013758601460166016601660166016601660166016600c6014600c00229309b2b1bae001230033754002ae6955cf2ab9f5742ae881';
 
 const checkSignatureScript: Script = {
     type: 'PlutusV2',
-    script: applyParamsToScript(checkSignatureCompiled, [ownPH])
-}
+    script: applyParamsToScript(checkSignatureCompiled, [ownPH]),
+};
 
-const checkSignatureAddress = lucid.utils.validatorToAddress(checkSignatureScript);
+const checkSignatureAddress =
+    lucid.utils.validatorToAddress(checkSignatureScript);
 
 const utxos = await lucid.utxosAt(checkSignatureAddress);
-const redeemer = Data.void()
+const redeemer = Data.void();
 
-const tx = await lucid
-    .newTx()
-    .collectFrom(utxos, redeemer)
+const newTx = lucid.newTx();
+
+if (utxos.length > 0) {
+    newTx
+        .collectFrom(utxos, redeemer)
+        .attachSpendingValidator(checkSignatureScript)
+        .addSignerKey(ownPH);
+}
+
+newTx
     .payToContract(
         checkSignatureAddress,
         { inline: Data.void(), scriptRef: charli3Bridge },
@@ -114,11 +121,9 @@ const tx = await lucid
         checkSignatureAddress,
         { inline: Data.void(), scriptRef: orcfaxBridge },
         {}
-    )
-    .addSignerKey(ownPH)
-    // uncomment the following line after deploying for the first time
-    // .attachSpendingValidator(checkSignatureScript) 
-    .complete();
+    );
+
+const tx = await newTx.complete();
 const txSigned = await tx.sign().complete();
 const txHash = await txSigned.submit();
 console.log(`Transaction submitted. TxHash: ${txHash}`);
