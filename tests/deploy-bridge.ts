@@ -1,12 +1,10 @@
 import {
-    Assets,
     Constr,
     Data,
     Lucid,
     Script,
     applyParamsToScript,
-    fromText,
-    toUnit,
+    fromText
 } from 'lucid-cardano';
 import { parseMOSEnv } from '../src/config.ts';
 
@@ -86,48 +84,46 @@ const orcfaxBridgeAddress = lucid.utils.validatorToAddress(orcfaxBridge);
 console.log('Orcfax Script Address: ', orcfaxBridgeAddress);
 console.log(orcfaxBridge.script);
 
-const BridgeDatumSchema = Data.Object({
-    pkh: Data.Bytes(),
-    token_name: Data.Bytes(),
-});
-type BridgeDatum = Data.Static<typeof BridgeDatumSchema>;
-const BridgeDatum = BridgeDatumSchema as unknown as BridgeDatum;
-
-const datumPayment = lucid.utils.paymentCredentialOf(
+const ownPH = lucid.utils.paymentCredentialOf(
     await lucid.wallet.address()
-);
+).hash;
 
-const bridgeDatum = {
-    pkh: datumPayment.hash,
-    token_name: fromText('Thread Token'),
-};
-const datum = Data.to<BridgeDatum>(bridgeDatum, BridgeDatum);
+const checkSignatureCompiled =
+    '586f010000323232323232232222533300732323300100100222533300c00114a026464a66601866e3c00802452889980200200098078011bae300d0013758601460166016601660166016601660166016600c6014600c00229309b2b1bae001230033754002ae6955cf2ab9f5742ae881';
 
-const spendScript: Script = {
+const checkSignatureScript: Script = {
     type: 'PlutusV2',
-    script: '587c0100003232323232323232322223253330083253330093370e90000008a5114a0600e0022930b1900199299980419b874800000454ccc02cc028dd50018a4c2c2c600c0046600200290001111199980319b8700100300a233330050053370000890011806000801001118019baa0015734aae7555cf2ab9f5742ae89',
+    script: applyParamsToScript(checkSignatureCompiled, [ownPH]),
 };
 
-const spendAddress = lucid.utils.validatorToAddress(spendScript);
+const checkSignatureAddress =
+    lucid.utils.validatorToAddress(checkSignatureScript);
 
-const utxos = await lucid.utxosAt(spendAddress);
-const redeemer = Data.to(new Constr(0, []));
+const utxos = await lucid.utxosAt(checkSignatureAddress);
+const redeemer = Data.void();
 
-const tx = await lucid
-    .newTx()
-    .collectFrom(utxos, redeemer)
+const newTx = lucid.newTx();
+
+if (utxos.length > 0) {
+    newTx
+        .collectFrom(utxos, redeemer)
+        .attachSpendingValidator(checkSignatureScript)
+        .addSignerKey(ownPH);
+}
+
+newTx
     .payToContract(
-        spendAddress,
+        checkSignatureAddress,
         { inline: Data.void(), scriptRef: charli3Bridge },
         {}
     )
     .payToContract(
-        spendAddress,
+        checkSignatureAddress,
         { inline: Data.void(), scriptRef: orcfaxBridge },
         {}
-    )
-    .attachSpendingValidator(spendScript)
-    .complete();
+    );
+
+const tx = await newTx.complete();
 const txSigned = await tx.sign().complete();
 const txHash = await txSigned.submit();
 console.log(`Transaction submitted. TxHash: ${txHash}`);
