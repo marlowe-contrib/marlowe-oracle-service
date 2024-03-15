@@ -4,6 +4,10 @@
 
 A complete design document can be found [here](./docs/design.md).
 
+## Useful documentation
+
+In this repository you can find a document explaining the [supported Oracles and its correct usage](./docs/known-feeds.md), and useful guides like [how to implement a validator for a new oracle or feed](./docs/guide-to-implement-a-new-validator.md) and [how to add a new oracle or feed to the off-chain](./docs/guide-to-implement-off-chain-for-a-new-oracle.md).
+
 ## Run the service
 
 We provide 3 ways to run the Marlowe Oracle Service:
@@ -109,7 +113,7 @@ $ docker build -t mos .
 $ docker run --env-file .docker.env mos
 ```
 
-### Run the MOS along with the Marlowe Apply Service.
+### Run the MOS along with the Marlowe Apply Service
 
 To run the Marlowe Oracle Service along with an instance of the Marlowe Apply Service, we provide a [docker-compose](docker-compose.yaml) file. This will pull the Marlowe Apply Service image from Dockerhub[^3] and build the MOS from the local `dockerfile`. We'll need the same .`docker.env` file as in the previous section but the variable `APPLY_URL` will have the value: `http://mas:3000/apply`.
 Then, we can build and run both services with:
@@ -150,11 +154,12 @@ The choice owner should be the oracle service's address or the role name, and th
 }
 ```
 
+In the command, the address that will be the Choice Owner is a parameter too. In the case for Charli3 and Orcfax this address will be the receipient of the role token.
 There's also an optional cli parameter to specify the marlowe tag to use. If not specified, it will use the default value of `requires.marlowe.oracle.test.alpha.1`.
 The complete command to deploy a marlowe contract, requesting charli3 oracle data would be:
 
 ```bash
-npm run deploy-example -- tests/charli3-choice-info.json requires.marlowe.oracle.test.alpha.2
+npm run deploy-example -- tests/choice-info/charli3.json addr_test1wrgrr6rrp3n2kauhw236ae2ekznyvf7czs2vqdvzn7ppdhs94vzyf requires.marlowe.oracle.test.alpha.2
 ```
 
 ## Bridge validators
@@ -174,7 +179,7 @@ To run the tests:
 $ aiken check
 ```
 
-## Using the deploy bridge utility.
+## Using the deploy bridge utility
 
 We provide a utility to easily deploy new reference scripts for the bridge validators. To use it follow these [instructions](./docs/how-to-use-deploy-bridge.md).
 
