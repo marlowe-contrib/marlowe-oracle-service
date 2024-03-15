@@ -40,7 +40,7 @@ Let’s now add the new resolve method field for Orcfax:
 https://github.com/marlowe-contrib/marlowe-oracle-service/blob/370a4aa454921e9737be3951f41d2684937caff1/mos-config.json#L23-L33
 
 The first two fields are similar to the ones for Charli3 since it’s the convention we decided that the choiceName must be the oracle’s name followed by the feed name, and that the role name must be the oracle’s name followed by the word oracle. This decision is explained in the [design document](design.md#1-using-oracles-in-a-marlowe-contract).
-The `bridgeValidatorUtxo` field has the same `txHash` as the one for Charli3 because we deployed them together, but you can find this information when you deploy a new validator. The same goes for the `bridgeAddress`. Before trying the validator specific for the oracle, it might be helpful to use an _always true_ validator to check that the off-chain works as expected. After we make sure that it is working correctly, we can use the off-chain to check that the validator works properly as well.
+The `bridgeValidatorUtxo` field has the same `txHash` as the one for Charli3 because we deployed them together. You can find the complete output reference that has the bridge validator and the `bridgeAddress` when you [deploy a new validator](how-to-use-deploy-bridge.md). Before trying the validator specific for the oracle, it might be helpful to use an _always true_ validator to check that the off-chain works as expected. After we make sure that it is working correctly, we can use the off-chain to check that the validator works properly as well.
 
 The other fields can be completed by looking at the documentation for the oracle.
 
@@ -80,7 +80,7 @@ https://github.com/marlowe-contrib/marlowe-oracle-service/blob/370a4aa454921e973
 
 ## Querying the prices
 
-The last module that we will have to modify is the [Feed module](../src/feed.ts). This module is responsible for querying the blockchain to find the UTxOs that hold the price information for every decentralized oracle.
+The last module that we will have to modify is the [feed module](../src/feed.ts). This module is responsible for querying the blockchain to find the UTxOs that hold the price information for every decentralized oracle.
 
 The implementation of this module will also have some boilerplate code like the previous modules, but there is one part that might take some more thought: the parsing and decoding of the datum that holds the price information. This might be fairly easy or difficult depending on the format of the datum, but in the implementation we propose there is a strategy that can work to parse any datum.
 

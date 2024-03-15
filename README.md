@@ -4,6 +4,10 @@
 
 A complete design document can be found [here](./docs/design.md).
 
+## Useful documentation
+
+In this repository you can find a document explaining the [supported Oracles and its correct usage](./docs/known-feeds.md), and useful guides like [how to implement a validator for a new oracle or feed](./docs/guide-to-implement-a-new-validator.md) and [how to add a new oracle or feed to the off-chain](./docs/guide-to-implement-off-chain-for-a-new-oracle.md).
+
 ## Run the service
 
 We provide 3 ways to run the Marlowe Oracle Service:
@@ -174,10 +178,6 @@ To run the tests:
 ```bash
 $ aiken check
 ```
-
-## Useful documentation
-
-In this repository you can find a document explaining the [supported Oracles and its correct usage](./docs/known-feeds.md), and useful guides like [how to implement a validator for a new oracle or feed](./docs/guide-to-implement-a-new-validator.md) and [how to add a new oracle or feed to the off-chain](./docs/guide-to-implement-off-chain-for-a-new-oracle.md).
 
 ## Using the deploy bridge utility
 
